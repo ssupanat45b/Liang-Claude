@@ -715,12 +715,30 @@
       ].join(','));
     });
     const blob = new Blob(['﻿' + lines.join('\r\n')], { type: 'text/csv;charset=utf-8' });
+    const filename = `solar_${inp.lat.toFixed(4)}_${inp.lon.toFixed(4)}_${inp.date}.csv`;
+    const okMsg = 'ส่งออกไฟล์ CSV แล้ว (97 แถว, 00:00–24:00 ทุก 15 นาที)';
+
+    // เมื่อเปิดใน Claude Artifact ใช้ downloads capability; เปิดไฟล์ปกติใช้ลิงก์ดาวน์โหลด
+    if (downloadsApi) {
+      downloadsApi.save({ filename, data: blob })
+        .then(() => setStatus(okMsg))
+        .catch((err) => {
+          const declined = err && err.code === 'declined';
+          setStatus(declined ? 'ยกเลิกการดาวน์โหลด' : 'ไม่สามารถดาวน์โหลดไฟล์ได้: ' + ((err && err.message) || err), !declined);
+        });
+      return;
+    }
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
-    a.download = `solar_${inp.lat.toFixed(4)}_${inp.lon.toFixed(4)}_${inp.date}.csv`;
+    a.download = filename;
     document.body.appendChild(a); a.click(); a.remove();
     setTimeout(() => URL.revokeObjectURL(a.href), 1000);
-    setStatus('ส่งออกไฟล์ CSV แล้ว (97 แถว, 00:00–24:00 ทุก 15 นาที)');
+    setStatus(okMsg);
+  }
+
+  let downloadsApi = null;
+  if (window.claude && typeof window.claude.use === 'function') {
+    window.claude.use('downloads').then((d) => { downloadsApi = d; }).catch(() => {});
   }
 
   /* ---------- Wiring ---------- */
