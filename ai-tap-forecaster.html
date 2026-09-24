@@ -1,0 +1,1229 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>AI Tap Forecaster</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans+Thai:wght@400;500;600&display=swap">
+<style>
+:root {
+  color-scheme: light;
+  --bg: #EDF1EF;
+  --surface: #FFFFFF;
+  --surface-2: #F5F8F6;
+  --ink: #14201C;
+  --muted: #56665F;
+  --faint: #8A9A93;
+  --line: #D3DCD8;
+  --grid: #E6ECE9;
+  --accent: #0B7A62;
+  --accent-soft: #DDF0EA;
+  --accent-ink: #FFFFFF;
+  --sun: #D4940F;
+  --sun-soft: rgba(212, 148, 15, .22);
+  --hv: #2C5DA8;
+  --over: #CF3F2E;
+  --under: #2A77D0;
+  --ok: #1F8A4C;
+  --warn: #B7791F;
+  --actual: #9AA7A2;
+  --predict: #14201C;
+  --opt: #D95319;
+  --tap1: #1F5FA8;
+  --tap2: #5B9BD5;
+  --tap3: #7E8C87;
+  --tap4: #E39A4C;
+  --tap5: #B5471B;
+  --shadow: 0 1px 2px rgba(20, 32, 28, .06), 0 4px 16px rgba(20, 32, 28, .05);
+  --f-display: "Chakra Petch", "IBM Plex Sans Thai", "Noto Sans Thai", Tahoma, sans-serif;
+  --f-body: "IBM Plex Sans Thai", "Noto Sans Thai", "Leelawadee UI", Tahoma, system-ui, sans-serif;
+  --f-mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --bg: #0C1311; --surface: #141E1B; --surface-2: #19251F; --ink: #E2EBE7; --muted: #9AABA4; --faint: #6D7F78;
+    --line: #29372F; --grid: #1F2B26; --accent: #36C29D; --accent-soft: #143A30; --accent-ink: #06201A;
+    --sun: #F0B43A; --sun-soft: rgba(240, 180, 58, .2); --hv: #74A2EC; --over: #F2685A; --under: #5EA3F2;
+    --ok: #4CC47F; --warn: #E3A948; --actual: #5E6D67; --predict: #E2EBE7; --opt: #FF8A4C;
+    --tap1: #4A8FE0; --tap2: #8DBCEB; --tap3: #8E9C97; --tap4: #F0B27A; --tap5: #E8703D;
+    --shadow: 0 1px 2px rgba(0, 0, 0, .3), 0 4px 16px rgba(0, 0, 0, .25);
+  }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #0C1311; --surface: #141E1B; --surface-2: #19251F; --ink: #E2EBE7; --muted: #9AABA4; --faint: #6D7F78;
+  --line: #29372F; --grid: #1F2B26; --accent: #36C29D; --accent-soft: #143A30; --accent-ink: #06201A;
+  --sun: #F0B43A; --sun-soft: rgba(240, 180, 58, .2); --hv: #74A2EC; --over: #F2685A; --under: #5EA3F2;
+  --ok: #4CC47F; --warn: #E3A948; --actual: #5E6D67; --predict: #E2EBE7; --opt: #FF8A4C;
+  --tap1: #4A8FE0; --tap2: #8DBCEB; --tap3: #8E9C97; --tap4: #F0B27A; --tap5: #E8703D;
+  --shadow: 0 1px 2px rgba(0, 0, 0, .3), 0 4px 16px rgba(0, 0, 0, .25);
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body {
+  background: var(--bg); color: var(--ink);
+  font: 400 14px/1.55 var(--f-body);
+  padding: 0 16px 32px;
+  -webkit-font-smoothing: antialiased;
+}
+h1, h2, h3 { font-family: var(--f-display); text-wrap: balance; margin: 0; }
+button, input, select { font: inherit; color: inherit; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.num, .mono { font-family: var(--f-mono); font-variant-numeric: tabular-nums; }
+
+/* ---------- header ---------- */
+.top {
+  max-width: 1440px; margin: 0 auto; padding-block: 18px 14px;
+  display: flex; flex-wrap: wrap; align-items: center; gap: 12px 24px;
+  border-bottom: 1px solid var(--line);
+}
+.brand { display: flex; align-items: center; gap: 12px; }
+.brand svg { flex: none; }
+.brand h1 { font-size: 22px; font-weight: 700; letter-spacing: .01em; line-height: 1.1; }
+.brand small { display: block; color: var(--muted); font: 500 12px/1.3 var(--f-body); }
+.site { margin-left: auto; display: flex; flex-wrap: wrap; align-items: center; gap: 6px 14px; }
+.site-name { font: 600 15px/1.3 var(--f-display); }
+.site-coord { color: var(--muted); font-size: 12.5px; }
+.pill {
+  display: inline-flex; align-items: center; gap: 6px; padding: 3px 10px; border-radius: 999px;
+  font: 500 12px/1.5 var(--f-body); border: 1px solid var(--line); background: var(--surface); white-space: nowrap;
+}
+.pill::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--faint); }
+.pill.ok::before { background: var(--ok); }
+.pill.busy::before { background: var(--warn); animation: blink 1s infinite; }
+.pill.stale::before { background: var(--warn); }
+.pill.err::before { background: var(--over); }
+@keyframes blink { 50% { opacity: .25; } }
+
+/* ---------- layout ---------- */
+.shell {
+  max-width: 1440px; margin: 0 auto; padding-top: 18px;
+  display: grid; grid-template-columns: 340px minmax(0, 1fr); gap: 20px; align-items: start;
+}
+@media (max-width: 980px) { .shell { grid-template-columns: minmax(0, 1fr); } }
+
+.config {
+  background: var(--surface); border: 1px solid var(--line); border-radius: 10px;
+  box-shadow: var(--shadow);
+  position: sticky; top: calc(env(safe-area-inset-top, 0px) + 12px);
+  max-height: calc(100vh - 24px); overflow: auto;
+}
+@media (max-width: 980px) { .config { position: static; max-height: none; } }
+.config form { display: flex; flex-direction: column; }
+.sect { padding: 16px 18px; border-bottom: 1px solid var(--line); display: flex; flex-direction: column; gap: 10px; }
+.sect h2 {
+  font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: .08em; color: var(--muted);
+  display: flex; align-items: baseline; gap: 8px;
+}
+.sect h2 b { color: var(--accent); font-family: var(--f-mono); font-weight: 500; }
+.field { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.field > span { font-size: 12.5px; color: var(--muted); }
+.row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; align-items: end; }
+input[type="number"], input[type="text"], input[type="date"], input[type="search"], select {
+  width: 100%; min-width: 0; padding: 7px 10px; border-radius: 7px; border: 1px solid var(--line);
+  background: var(--surface-2); outline: none;
+}
+input:focus, select:focus { border-color: var(--accent); }
+input[type="number"] { font-family: var(--f-mono); }
+input[type="range"] { width: 100%; accent-color: var(--accent); }
+.hint { font-size: 12px; color: var(--muted); margin: 0; }
+.hint.err { color: var(--over); }
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  padding: 8px 12px; border-radius: 7px; border: 1px solid var(--line); background: var(--surface-2);
+  cursor: pointer; font-weight: 500; white-space: nowrap;
+}
+.btn:hover { border-color: var(--accent); }
+.btn:disabled { opacity: .55; cursor: progress; }
+.btn.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); font-family: var(--f-display); font-weight: 600; font-size: 15px; padding: 11px 14px; }
+.btn.primary:hover { filter: brightness(1.08); }
+.gps { width: 100%; }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.chip {
+  padding: 3px 10px; border-radius: 999px; border: 1px solid var(--line); background: var(--surface);
+  font-size: 12.5px; cursor: pointer;
+}
+.chip:hover { border-color: var(--accent); color: var(--accent); }
+.chip[aria-pressed="true"] { background: var(--accent-soft); border-color: var(--accent); color: var(--accent); }
+.seg { display: grid; grid-template-columns: 1fr 1fr; border: 1px solid var(--line); border-radius: 7px; overflow: hidden; }
+.seg label { display: block; cursor: pointer; }
+.seg input { position: absolute; opacity: 0; pointer-events: none; }
+.seg span { display: block; text-align: center; padding: 7px 6px; font-size: 12.5px; background: var(--surface-2); }
+.seg label + label span { border-left: 1px solid var(--line); }
+.seg input:checked + span { background: var(--accent-soft); color: var(--accent); font-weight: 600; }
+.seg input:focus-visible + span { outline: 2px solid var(--accent); outline-offset: -2px; }
+.band {
+  display: flex; justify-content: space-between; align-items: baseline; font-size: 12.5px;
+  padding: 6px 10px; border-radius: 7px; background: var(--surface-2); border: 1px dashed var(--line);
+}
+.band b { font-family: var(--f-mono); font-weight: 500; }
+.sunline { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+.sunline div { background: var(--surface-2); border-radius: 7px; padding: 6px 8px; }
+.sunline span { display: block; font-size: 11px; color: var(--muted); }
+.sunline b { font: 500 14px/1.3 var(--f-mono); }
+.run { padding: 16px 18px; display: flex; flex-direction: column; gap: 10px; position: sticky; bottom: 0; background: var(--surface); }
+.progress { height: 6px; border-radius: 3px; background: var(--grid); overflow: hidden; }
+.progress i { display: block; height: 100%; width: 0; background: var(--accent); transition: width .15s; }
+details.adv summary { cursor: pointer; font-size: 12.5px; color: var(--muted); }
+details.adv[open] summary { margin-bottom: 10px; }
+
+/* ---------- main ---------- */
+.main { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+.kpis { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
+@media (max-width: 1180px) { .kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.kpi { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; display: flex; flex-direction: column; gap: 2px; }
+.kpi > span { font-size: 12px; color: var(--muted); }
+.kpi strong { font: 600 26px/1.15 var(--f-display); }
+.kpi strong.tapbig { color: var(--accent); }
+.kpi em { font-style: normal; font-size: 12.5px; color: var(--muted); }
+.kpi em .num { color: var(--ink); }
+
+.panel { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; min-width: 0; }
+.panel-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 14px; margin-bottom: 8px; }
+.panel-head h3 { font-size: 15px; font-weight: 600; }
+.panel-head h3 i { font-style: normal; color: var(--accent); font-family: var(--f-mono); font-weight: 500; margin-right: 6px; }
+.panel-head .sub { color: var(--muted); font-size: 12.5px; }
+.legend { display: flex; flex-wrap: wrap; gap: 4px 14px; margin-left: auto; font-size: 12px; color: var(--muted); }
+.legend span { display: inline-flex; align-items: center; gap: 6px; }
+.legend i { display: inline-block; width: 16px; height: 3px; border-radius: 2px; }
+.legend i.dash { background: repeating-linear-gradient(90deg, currentColor 0 4px, transparent 4px 7px) !important; height: 2px; }
+.legend i.box { width: 10px; height: 10px; border-radius: 2px; }
+.cv { position: relative; width: 100%; }
+.cv canvas { display: block; width: 100%; height: 100%; touch-action: pan-y; }
+
+.daybar { display: flex; flex-wrap: wrap; gap: 10px 16px; align-items: center; }
+.daybar .field { flex: 1 1 220px; }
+.daybar .seg { flex: 0 1 360px; }
+.schedule { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 4px; }
+.sday {
+  flex: none; display: flex; flex-direction: column; align-items: center; gap: 1px; min-width: 58px;
+  padding: 6px 6px; border-radius: 8px; border: 1px solid var(--line); background: var(--surface-2); cursor: pointer;
+}
+.sday small { font-size: 11px; color: var(--muted); }
+.sday b { font: 600 14px/1.2 var(--f-display); }
+.sday em { font: 400 10.5px/1.2 var(--f-mono); font-style: normal; color: var(--muted); }
+.sday.viol em { color: var(--over); }
+.sday.train { border-style: dashed; }
+.sday[aria-pressed="true"] { border-color: var(--accent); background: var(--accent-soft); }
+.sday[aria-pressed="true"] b { color: var(--accent); }
+
+.grid2 { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); gap: 16px; }
+@media (max-width: 1180px) { .grid2 { grid-template-columns: minmax(0, 1fr); } }
+.tablewrap { overflow-x: auto; }
+table { border-collapse: collapse; width: 100%; font-size: 13px; }
+th, td { padding: 7px 6px; text-align: right; border-bottom: 1px solid var(--grid); white-space: nowrap; }
+th:first-child, td:first-child { text-align: left; }
+th { font-weight: 500; color: var(--muted); font-size: 12px; }
+td { font-family: var(--f-mono); font-variant-numeric: tabular-nums; }
+td:first-child { font-family: var(--f-body); }
+tr.best td { background: var(--accent-soft); }
+tr.best td:first-child { font-weight: 600; color: var(--accent); }
+.sw { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 8px; vertical-align: -1px; }
+.console {
+  margin: 0; font: 12.5px/1.55 var(--f-mono); color: var(--ink); background: var(--surface-2);
+  border-radius: 8px; padding: 12px 14px; overflow-x: auto; max-height: 280px; white-space: pre;
+}
+footer { max-width: 1440px; margin: 24px auto 0; color: var(--muted); font-size: 12px; }
+@media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
+</style>
+</head>
+<body>
+
+<header class="top">
+  <div class="brand">
+    <svg width="38" height="38" viewBox="0 0 38 38" aria-hidden="true">
+      <rect x="1" y="1" width="36" height="36" rx="8" fill="var(--accent)"/>
+      <circle cx="13.5" cy="19" r="6.5" fill="none" stroke="var(--accent-ink)" stroke-width="2.2"/>
+      <circle cx="24.5" cy="19" r="6.5" fill="none" stroke="var(--accent-ink)" stroke-width="2.2"/>
+      <path d="M19 6v5M19 27v5" stroke="var(--accent-ink)" stroke-width="2.2" stroke-linecap="round"/>
+    </svg>
+    <div>
+      <h1>AI Tap Forecaster</h1>
+      <small>พยากรณ์แรงดันด้านแรงต่ำด้วย LSTM และเลือกตำแหน่งแท็ปหม้อแปลงเพื่อลดนาทีที่แรงดันหลุดเกณฑ์</small>
+    </div>
+  </div>
+  <div class="site">
+    <div>
+      <div class="site-name" id="siteName">—</div>
+      <div class="site-coord num" id="siteCoord">—</div>
+    </div>
+    <span class="pill" id="status">พร้อม</span>
+  </div>
+</header>
+
+<div class="shell">
+  <aside class="config" aria-label="การตั้งค่าระบบ">
+    <form id="cfg" novalidate>
+      <section class="sect">
+        <h2><b>01</b>ตำแหน่งที่ตั้งสถานี</h2>
+        <label class="field">
+          <span>ค้นหาอำเภอ / เขต</span>
+          <input type="search" id="q" list="qlist" placeholder="พิมพ์ชื่ออำเภอหรือจังหวัด เช่น บางเลน" autocomplete="off">
+          <datalist id="qlist"></datalist>
+        </label>
+        <div class="row2">
+          <label class="field"><span>จังหวัด (77)</span><select id="prov"></select></label>
+          <label class="field"><span>อำเภอ / เขต</span><select id="dist"></select></label>
+        </div>
+        <div class="row2">
+          <label class="field"><span>ละติจูด (°N)</span><input type="number" id="lat" step="0.0001" min="-90" max="90"></label>
+          <label class="field"><span>ลองจิจูด (°E)</span><input type="number" id="lon" step="0.0001" min="-180" max="180"></label>
+        </div>
+        <button type="button" class="btn gps" id="gpsBtn">
+          <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="4.5" fill="none" stroke="currentColor" stroke-width="1.6"/><circle cx="8" cy="8" r="1.6" fill="currentColor"/><path d="M8 0.8v2.4M8 12.8v2.4M0.8 8h2.4M12.8 8h2.4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+          ใช้ตำแหน่งปัจจุบัน (GPS)
+        </button>
+        <p class="hint" id="locHint">เลือกจังหวัดและอำเภอ พิมพ์พิกัดเอง หรือใช้ GPS ของอุปกรณ์</p>
+        <div class="field">
+          <span>ตำแหน่งตัวอย่าง</span>
+          <div class="chips" id="samples"></div>
+        </div>
+        <div class="sunline" aria-label="ข้อมูลดวงอาทิตย์วันแรกของช่วงข้อมูล">
+          <div><span>ดวงอาทิตย์ขึ้น</span><b id="sRise">—</b></div>
+          <div><span>เที่ยงสุริยะ</span><b id="sNoon">—</b></div>
+          <div><span>ดวงอาทิตย์ตก</span><b id="sSet">—</b></div>
+        </div>
+      </section>
+
+      <section class="sect">
+        <h2><b>02</b>ระบบไฟฟ้า</h2>
+        <div class="row2">
+          <label class="field"><span>หม้อแปลง (kVA)</span><input type="number" id="trafo" value="500" min="50" max="5000" step="10"></label>
+          <label class="field"><span>อินเวอร์เตอร์ PV (kW)</span><input type="number" id="pv" value="250" min="0" max="5000" step="10"></label>
+        </div>
+      </section>
+
+      <section class="sect">
+        <h2><b>03</b>มาตรฐานแรงดัน</h2>
+        <div class="row2">
+          <label class="field"><span>แรงดันเป้าหมาย (380–416 V)</span><input type="number" id="target" value="400" min="380" max="416" step="1"></label>
+          <label class="field"><span>พิกัดเผื่อ ± (2–10 %)</span><input type="number" id="tol" value="5" min="2" max="10" step="0.5"></label>
+        </div>
+        <input type="range" id="tolR" min="2" max="10" step="0.5" value="5" aria-label="พิกัดเผื่อแรงดัน">
+        <div class="band"><span>ช่วงที่ยอมรับ</span><b id="bandTxt">380.0 – 420.0 V</b></div>
+        <p class="hint">ปรับพิกัดเผื่อได้ทันทีโดยไม่ต้องฝึก LSTM ใหม่</p>
+      </section>
+
+      <section class="sect">
+        <h2><b>04</b>ข้อมูลแสงแดด</h2>
+        <div class="seg" role="radiogroup" aria-label="แหล่งข้อมูลแสงแดด">
+          <label><input type="radio" name="src" value="model" checked><span>แบบจำลองท้องฟ้า</span></label>
+          <label><input type="radio" name="src" value="meteo"><span>ข้อมูลจริง Open-Meteo</span></label>
+        </div>
+        <label class="field" id="cloudField">
+          <span>ความแปรปรวนของเมฆ <b class="num" id="cloudTxt">20%</b></span>
+          <input type="range" id="cloud" min="0" max="100" step="5" value="20">
+        </label>
+        <p class="hint" id="srcHint">คำนวณมุมดวงอาทิตย์จากพิกัด (NOAA) และรังสีท้องฟ้าใส (Haurwitz) แล้วลดทอนด้วยเมฆสุ่ม</p>
+        <div class="row2">
+          <label class="field"><span>วันเริ่มต้น</span><input type="date" id="d0" value="2025-12-28"></label>
+          <label class="field"><span>วันสิ้นสุด</span><input type="date" id="d1" value="2026-01-31"></label>
+        </div>
+        <details class="adv">
+          <summary>ตั้งค่า LSTM ขั้นสูง</summary>
+          <div class="row2">
+            <label class="field"><span>Hidden units</span><input type="number" id="hid" value="32" min="4" max="100" step="1"></label>
+            <label class="field"><span>Epochs</span><input type="number" id="ep" value="40" min="5" max="150" step="5"></label>
+          </div>
+          <label class="field" style="margin-top:10px"><span>Initial learn rate</span><input type="number" id="lr" value="0.01" min="0.0005" max="0.05" step="0.0005"></label>
+          <p class="hint" style="margin-top:6px">Adam, gradient threshold 1, ลด learn rate ×0.2 เมื่อผ่าน 2/3 ของ epochs (piecewise)</p>
+        </details>
+      </section>
+
+      <div class="run">
+        <button type="submit" class="btn primary" id="runBtn">จำลองและฝึก LSTM</button>
+        <div class="progress" aria-hidden="true"><i id="prog"></i></div>
+        <p class="hint" id="runHint">ข้อมูลทุก 15 นาที · ฝึก 80% แรก · ทดสอบ 20% หลัง (ตัดที่เที่ยงคืน)</p>
+      </div>
+    </form>
+  </aside>
+
+  <main class="main">
+    <div class="kpis">
+      <div class="kpi"><span>แท็ปที่แนะนำ (วันที่เลือก)</span><strong class="tapbig" id="kTap">—</strong><em id="kTapSub">—</em></div>
+      <div class="kpi"><span>นาทีที่หลุดเกณฑ์ (แท็ปแนะนำ / Tap 3)</span><strong class="num" id="kViol">—</strong><em id="kViolSub">—</em></div>
+      <div class="kpi"><span>ความแม่นยำชุดทดสอบ</span><strong class="num" id="kTest">—</strong><em id="kTestSub">—</em></div>
+      <div class="kpi"><span>ความแม่นยำชุดฝึกสอน</span><strong class="num" id="kTrain">—</strong><em id="kTrainSub">—</em></div>
+    </div>
+
+    <section class="panel">
+      <div class="daybar">
+        <div class="seg" role="radiogroup" aria-label="ชุดข้อมูล">
+          <label><input type="radio" name="set" value="train"><span>Historical Validation</span></label>
+          <label><input type="radio" name="set" value="test" checked><span>Future Forecast</span></label>
+        </div>
+        <label class="field"><span>วันที่แสดงผล</span><select id="daySel"></select></label>
+      </div>
+      <div class="panel-head" style="margin:12px 0 6px"><h3>แผนปรับแท็ปรายวัน</h3><span class="sub" id="schedSub">แท็ปที่ดีที่สุดของแต่ละวันและนาทีที่ยังหลุดเกณฑ์</span></div>
+      <div class="schedule" id="schedule"></div>
+    </section>
+
+    <section class="panel">
+      <div class="panel-head"><h3><i>1</i>ความเข้มแสงอาทิตย์</h3><span class="sub" id="t1sub"></span>
+        <div class="legend"><span><i class="box" style="background:var(--sun)"></i>รังสีรวมแนวราบ (W/m²)</span></div></div>
+      <div class="cv" style="height:130px"><canvas id="c1"></canvas></div>
+    </section>
+
+    <section class="panel">
+      <div class="panel-head"><h3><i>2</i>แรงดันด้านแรงสูง (สาย 22 kV)</h3>
+        <div class="legend"><span><i style="background:var(--hv)"></i>v22 (V)</span></div></div>
+      <div class="cv" style="height:130px"><canvas id="c2"></canvas></div>
+    </section>
+
+    <section class="panel">
+      <div class="panel-head"><h3><i>3</i>เปรียบเทียบกลยุทธ์แท็ป</h3>
+        <div class="legend" id="lg3"></div></div>
+      <div class="cv" style="height:220px"><canvas id="c3"></canvas></div>
+    </section>
+
+    <section class="panel">
+      <div class="panel-head"><h3><i>4</i>ผลวิเคราะห์ LSTM: แรงดันหลังปรับแท็ป</h3>
+        <div class="legend">
+          <span><i style="background:var(--actual)"></i>ค่าจริง</span>
+          <span><i class="dash" style="color:var(--predict)"></i>LSTM ทำนาย</span>
+          <span><i style="background:var(--opt)"></i>หลังปรับแท็ป</span>
+          <span><i class="dash" style="color:var(--over)"></i>ขอบเขตแรงดัน</span>
+        </div></div>
+      <div class="cv" style="height:220px"><canvas id="c4"></canvas></div>
+    </section>
+
+    <div class="grid2">
+      <section class="panel">
+        <div class="panel-head"><h3><i>5</i>ตรวจสอบคุณภาพ: นาทีที่หลุดเกณฑ์</h3><span class="sub" id="t5sub"></span>
+          <div class="legend"><span><i class="box" style="background:var(--under)"></i>แรงดันต่ำ</span><span><i class="box" style="background:var(--over)"></i>แรงดันเกิน</span></div></div>
+        <div class="cv" style="height:230px"><canvas id="c5"></canvas></div>
+      </section>
+      <section class="panel">
+        <div class="panel-head"><h3>ตารางสรุปแท็ป</h3><span class="sub">ค่าจากการทำนายของ LSTM</span></div>
+        <div class="tablewrap"><table>
+          <thead><tr><th>แท็ป</th><th>ปรับ</th><th>ต่ำ (min)</th><th>เกิน (min)</th><th>รวม</th><th>ต่ำสุด V</th><th>สูงสุด V</th></tr></thead>
+          <tbody id="tapTbl"></tbody>
+        </table></div>
+      </section>
+    </div>
+
+    <div class="grid2">
+      <section class="panel">
+        <div class="panel-head"><h3>บันทึกการทำงาน</h3><span class="sub">รูปแบบเดียวกับหน้าต่าง Command Window ของ MATLAB</span></div>
+        <pre class="console" id="log"></pre>
+      </section>
+      <section class="panel">
+        <div class="panel-head"><h3>การเรียนรู้ของ LSTM</h3><span class="sub">RMSE ชุดฝึกสอนต่อ epoch (V)</span></div>
+        <div class="cv" style="height:200px"><canvas id="c6"></canvas></div>
+      </section>
+    </div>
+  </main>
+</div>
+
+<footer>
+  ข้อมูลโหลดและแรงดันเป็นข้อมูลจำลองตามสมการของโปรแกรม MATLAB ต้นฉบับ · พิกัดอำเภอเป็นจุดศูนย์กลางพื้นที่ (centroid) ของขอบเขตอำเภอ 928 แห่ง · เวลาทั้งหมดเป็นเวลาประเทศไทย (UTC+7)
+</footer>
+
+<script>
+const THAI_GEO=[["กระบี่","Krabi",[["เมืองกระบี่",8.1383,98.8485],["เขาพนม",8.2733,99.1206],["เกาะลันตา",7.6806,99.0768],["คลองท่อม",7.901,99.1998],["อ่าวลึก",8.364,98.75],["ปลายพระยา",8.5481,98.8315],["ลำทับ",8.0453,99.3347],["เหนือคลอง",8.0326,99.0372]]],["กรุงเทพมหานคร","Bangkok",[["พระนคร",13.7554,100.4982],["ดุสิต",13.7802,100.518],["หนองจอก",13.8523,100.8576],["บางรัก",13.7272,100.5241],["บางเขน",13.8663,100.6301],["บางกะปิ",13.7695,100.6397],["ปทุมวัน",13.7395,100.5357],["ป้อมปราบศัตรูพ่าย",13.7509,100.5112],["พระโขนง",13.6925,100.6133],["มีนบุรี",13.8089,100.755],["ลาดกระบัง",13.7452,100.7912],["ยานนาวา",13.691,100.5395],["สัมพันธวงศ์",13.7386,100.5087],["พญาไท",13.7818,100.544],["ธนบุรี",13.7152,100.4855],["บางกอกใหญ่",13.7356,100.4765],["ห้วยขวาง",13.7675,100.5832],["คลองสาน",13.7234,100.5025],["ตลิ่งชัน",13.772,100.4347],["บางกอกน้อย",13.7624,100.4716],["บางขุนเทียน",13.589,100.428],["ภาษีเจริญ",13.7239,100.4419],["หนองแขม",13.6954,100.3552],["ราษฎร์บูรณะ",13.6729,100.4998],["บางพลัด",13.7876,100.494],["ดินแดง",13.7753,100.5627],["บึงกุ่ม",13.8087,100.651],["สาทร",13.7145,100.5306],["บางซื่อ",13.8192,100.5281],["จตุจักร",13.8264,100.5651],["บางคอแหลม",13.6966,100.5106],["ประเวศ",13.699,100.6769],["คลองเตย",13.716,100.5716],["สวนหลวง",13.726,100.6285],["จอมทอง",13.6869,100.463],["ดอนเมือง",13.9244,100.5932],["ราชเทวี",13.7572,100.5384],["ลาดพร้าว",13.8245,100.6085],["วัฒนา",13.7314,100.5844],["บางแค",13.7153,100.3953],["หลักสี่",13.8798,100.5678],["สายไหม",13.9058,100.6531],["คันนายาว",13.8206,100.6774],["สะพานสูง",13.7621,100.6907],["วังทองหลาง",13.779,100.6095],["คลองสามวา",13.8742,100.7386],["บางนา",13.6692,100.6185],["ทวีวัฒนา",13.775,100.3678],["ทุ่งครุ",13.6285,100.4963],["บางบอน",13.6564,100.3917]]],["กาญจนบุรี","Kanchanaburi",[["เมืองกาญจนบุรี",14.0731,99.3298],["ไทรโยค",14.2603,98.9243],["บ่อพลอย",14.4037,99.4408],["ศรีสวัสดิ์",14.6681,99.1219],["ท่ามะกา",13.9454,99.7779],["ท่าม่วง",13.9177,99.6029],["ทองผาภูมิ",14.8322,98.69],["สังขละบุรี",15.1988,98.5257],["พนมทวน",14.1581,99.6855],["เลาขวัญ",14.5984,99.6896],["ด่านมะขามเตี้ย",13.8392,99.3254],["หนองปรือ",14.6747,99.4158],["ห้วยกระเจา",14.3412,99.6747]]],["กาฬสินธุ์","Kalasin",[["เมืองกาฬสินธุ์",16.5149,103.556],["นามน",16.5805,103.7887],["กมลาไสย",16.289,103.6063],["ร่องคำ",16.2886,103.7153],["กุฉินารายณ์",16.5235,104.0509],["เขาวง",16.682,104.1047],["ยางตลาด",16.4429,103.3495],["ห้วยเม็ก",16.5973,103.2372],["สหัสขันธ์",16.7183,103.585],["คำม่วง",16.9489,103.6461],["ท่าคันโท",16.8823,103.2426],["หนองกุงศรี",16.724,103.3418],["สมเด็จ",16.7759,103.7567],["ห้วยผึ้ง",16.6742,103.8872],["สามชัย",16.8853,103.5242],["นาคู",16.7618,104.0078],["ดอนจาน",16.4746,103.7145],["ฆ้องชัย",16.2613,103.4748]]],["กำแพงเพชร","Kamphaeng Phet",[["เมืองกำแพงเพชร",16.4255,99.5089],["ไทรงาม",16.443,99.8619],["คลองลาน",16.2495,99.2308],["ขาณุวรลักษบุรี",16.016,99.6718],["คลองขลุง",16.2234,99.6866],["พรานกระต่าย",16.7102,99.5513],["ลานกระบือ",16.6022,99.8576],["ทรายทองวัฒนา",16.3134,99.8716],["ปางศิลาทอง",16.027,99.3122],["บึงสามัคคี",16.2213,99.9642],["โกสัมพีนคร",16.5761,99.2851]]],["ขอนแก่น","Khon Kaen",[["เมืองขอนแก่น",16.4635,102.8042],["บ้านฝาง",16.4964,102.6151],["พระยืน",16.3118,102.6687],["หนองเรือ",16.4946,102.4448],["ชุมแพ",16.62,102.0924],["สีชมพู",16.7656,102.1245],["น้ำพอง",16.7015,102.8794],["อุบลรัตน์",16.7842,102.6751],["กระนวน",16.7562,103.0793],["บ้านไผ่",16.0486,102.772],["เปือยน้อย",15.8941,102.8631],["พล",15.8087,102.591],["แวงใหญ่",15.9283,102.4593],["แวงน้อย",15.809,102.4134],["หนองสองห้อง",15.7638,102.7894],["ภูเวียง",16.6731,102.4646],["มัญจาคีรี",16.2181,102.5193],["ชนบท",16.0252,102.5569],["เขาสวนกวาง",16.92,102.7806],["ภูผาม่าน",16.7177,101.8684],["ซำสูง",16.5642,103.0507],["โคกโพธิ์ไชย",16.0766,102.386],["หนองนาคำ",16.8096,102.3301],["บ้านแฮด",16.2056,102.7663],["โนนศิลา",15.9669,102.6839],["เวียงเก่า",16.7009,102.2659]]],["จันทบุรี","Chanthaburi",[["เมืองจันทบุรี",12.6026,102.119],["ขลุง",12.5402,102.298],["ท่าใหม่",12.7262,101.9781],["โป่งน้ำร้อน",12.9388,102.3693],["มะขาม",12.7365,102.2222],["แหลมสิงห์",12.4673,102.122],["สอยดาว",13.1838,102.2317],["แก่งหางแมว",13.0939,101.884],["นายายอาม",12.7389,101.8718],["เขาคิชฌกูฏ",12.9543,102.0963]]],["ฉะเชิงเทรา","Chachoengsao",[["เมืองฉะเชิงเทรา",13.7185,101.014],["บางคล้า",13.7449,101.2072],["บางน้ำเปรี้ยว",13.8826,101.0295],["บางปะกง",13.5319,100.9617],["บ้านโพธิ์",13.6093,101.0814],["พนมสารคาม",13.7391,101.4121],["ราชสาส์น",13.7879,101.2833],["สนามชัยเขต",13.6194,101.6458],["แปลงยาว",13.5571,101.3435],["ท่าตะเกียบ",13.3922,101.7417],["คลองเขื่อน",13.778,101.1536]]],["ชลบุรี","Chonburi",[["เมืองชลบุรี",13.3426,100.9973],["บ้านบึง",13.2504,101.1798],["หนองใหญ่",13.1263,101.3752],["บางละมุง",12.9209,100.9819],["พานทอง",13.4625,101.0862],["พนัสนิคม",13.4687,101.2191],["ศรีราชา",13.1268,101.0391],["เกาะสีชัง",13.1514,100.8089],["สัตหีบ",12.7109,100.918],["บ่อทอง",13.2459,101.5077],["เกาะจันทร์",13.3981,101.3919]]],["ชัยนาท","Chainat",[["เมืองชัยนาท",15.1905,100.1313],["มโนรมย์",15.322,100.1668],["วัดสิงห์",15.2129,99.9727],["สรรพยา",15.1498,100.2542],["สรรคบุรี",15.0202,100.1742],["หันคา",15.051,99.9616],["หนองมะโมง",15.2363,99.8245],["เนินขาม",14.9886,99.8407]]],["ชัยภูมิ","Chaiyaphum",[["เมืองชัยภูมิ",15.8967,102.0361],["บ้านเขว้า",15.8249,101.8365],["คอนสวรรค์",15.9324,102.2717],["เกษตรสมบูรณ์",16.2943,101.9028],["หนองบัวแดง",16.1992,101.6233],["จัตุรัส",15.5777,101.841],["บำเหน็จณรงค์",15.4678,101.6518],["หนองบัวระเหว",15.8357,101.6325],["เทพสถิต",15.597,101.4746],["ภูเขียว",16.351,102.1571],["บ้านแท่น",16.3801,102.3468],["แก้งคร้อ",16.132,102.2106],["คอนสาร",16.5486,101.719],["ภักดีชุมพล",15.9695,101.4064],["เนินสง่า",15.5574,101.9919],["ซับใหญ่",15.6141,101.6393]]],["ชุมพร","Chumphon",[["เมืองชุมพร",10.4619,99.1019],["ท่าแซะ",10.771,99.0948],["ปะทิว",10.8114,99.3396],["หลังสวน",9.9396,99.0462],["ละแม",9.7569,99.0221],["พะโต๊ะ",9.8129,98.7992],["สวี",10.2396,99.0172],["ทุ่งตะโก",10.0915,99.0495]]],["ตรัง","Trang",[["เมืองตรัง",7.6095,99.6195],["กันตัง",7.3997,99.4799],["ย่านตาขาว",7.4231,99.7385],["ปะเหลียน",7.2532,99.7669],["สิเกา",7.6003,99.3564],["ห้วยยอด",7.7915,99.6065],["วังวิเศษ",7.7483,99.413],["นาโยง",7.5593,99.7443],["รัษฎา",7.9391,99.6657],["หาดสำราญ",7.2375,99.5837]]],["ตราด","Trat",[["เมืองตราด",12.2654,102.5972],["คลองใหญ่",11.8505,102.8361],["เขาสมิง",12.4368,102.4164],["บ่อไร่",12.5581,102.5712],["แหลมงอบ",12.2207,102.3652],["เกาะกูด",11.6796,102.553],["เกาะช้าง",12.0468,102.3381]]],["ตาก","Tak",[["เมืองตาก",16.8904,99.1663],["บ้านตาก",17.1091,99.075],["สามเงา",17.4021,98.8048],["แม่ระมาด",17.0778,98.6174],["ท่าสองยาง",17.4823,98.1203],["แม่สอด",16.7491,98.7116],["พบพระ",16.475,98.8218],["อุ้มผาง",15.7986,98.8772],["วังเจ้า",16.6202,99.1284]]],["นครนายก","Nakhon Nayok",[["เมืองนครนายก",14.2786,101.2313],["ปากพลี",14.2282,101.3429],["บ้านนา",14.2699,101.0633],["องครักษ์",14.0754,101.0074]]],["นครปฐม","Nakhon Pathom",[["เมืองนครปฐม",13.8204,100.0203],["กำแพงแสน",14.0308,99.9618],["นครชัยศรี",13.8214,100.1788],["ดอนตูม",13.9499,100.0923],["บางเลน",14.0471,100.1861],["สามพราน",13.7238,100.2161],["พุทธมณฑล",13.8309,100.2879]]],["นครพนม","Nakhon Phanom",[["เมืองนครพนม",17.3208,104.6622],["ปลาปาก",17.2007,104.5384],["ท่าอุเทน",17.6081,104.4967],["บ้านแพง",17.8737,104.217],["ธาตุพนม",16.9629,104.7026],["เรณูนคร",17.0548,104.6469],["นาแก",16.9408,104.4648],["ศรีสงคราม",17.6387,104.2344],["นาหว้า",17.5012,104.0982],["โพนสวรรค์",17.4663,104.4089],["นาทม",17.8408,104.0977],["วังยาง",17.0729,104.4392]]],["นครราชสีมา","Nakhon Ratchasima",[["เมืองนครราชสีมา",14.97,102.0925],["ครบุรี",14.3804,102.2135],["เสิงสาง",14.3552,102.4808],["คง",15.4347,102.2942],["บ้านเหลื่อม",15.5736,102.144],["จักราช",14.9518,102.4395],["โชคชัย",14.7597,102.2036],["ด่านขุนทด",15.2227,101.7002],["โนนไทย",15.191,102.0239],["โนนสูง",15.2126,102.2755],["ขามสะแกแสง",15.3823,102.1698],["บัวใหญ่",15.5896,102.3792],["ประทาย",15.5664,102.6994],["ปักธงชัย",14.6637,101.9378],["พิมาย",15.2517,102.5419],["ห้วยแถลง",15.0432,102.6347],["ชุมพวง",15.2655,102.7531],["สูงเนิน",14.859,101.8283],["ขามทะเลสอ",15.0291,101.93],["สีคิ้ว",14.9446,101.6004],["ปากช่อง",14.6192,101.4574],["หนองบุญมาก",14.7178,102.3737],["แก้งสนามนาง",15.7021,102.2465],["โนนแดง",15.4488,102.5354],["วังน้ำเขียว",14.4329,101.8709],["เทพารักษ์",15.2856,101.5056],["เมืองยาง",15.4399,102.8861],["พระทองคำ",15.3546,101.9854],["ลำทะเมนชัย",15.2866,102.9048],["บัวลาย",15.6704,102.5126],["สีดา",15.5638,102.55],["เฉลิมพระเกียรติ",14.9801,102.2907]]],["นครศรีธรรมราช","Nakhon Si Thammarat",[["เมืองนครศรีธรรมราช",8.4344,99.9714],["พรหมคีรี",8.5461,99.8068],["ลานสกา",8.3771,99.7757],["ฉวาง",8.4799,99.529],["พิปูน",8.5978,99.6001],["เชียรใหญ่",8.1209,100.1523],["ชะอวด",7.9575,99.9847],["ท่าศาลา",8.6997,99.8796],["ทุ่งสง",8.1151,99.6569],["นาบอน",8.2695,99.5514],["ทุ่งใหญ่",8.2917,99.3727],["ปากพนัง",8.3093,100.1673],["ร่อนพิบูลย์",8.1958,99.8865],["สิชล",8.9493,99.8092],["ขนอม",9.1907,99.8085],["หัวไทร",8.0091,100.2442],["บางขัน",8.0048,99.4795],["ถ้ำพรรณรา",8.4611,99.3814],["จุฬาภรณ์",8.0745,99.8626],["พระพรหม",8.3241,99.9353],["นบพิตำ",8.7555,99.6759],["ช้างกลาง",8.3556,99.6291],["เฉลิมพระเกียรติ",8.1749,100.0383]]],["นครสวรรค์","Nakhon Sawan",[["เมืองนครสวรรค์",15.7159,100.1019],["โกรกพระ",15.587,100.0176],["ชุมแสง",15.8473,100.2917],["หนองบัว",15.8653,100.6235],["บรรพตพิสัย",15.9952,99.9901],["เก้าเลี้ยว",15.8801,100.0988],["ตาคลี",15.2603,100.3874],["ท่าตะโก",15.6565,100.4542],["ไพศาลี",15.5867,100.6796],["พยุหะคีรี",15.505,100.2102],["ลาดยาว",15.7722,99.7955],["ตากฟ้า",15.3809,100.4761],["แม่วงก์",15.8386,99.4006],["แม่เปิน",15.6888,99.3901],["ชุมตาบง",15.6792,99.5548]]],["นนทบุรี","Nonthaburi",[["เมืองนนทบุรี",13.8569,100.4912],["บางกรวย",13.8132,100.4211],["บางใหญ่",13.8562,100.3692],["บางบัวทอง",13.9308,100.3945],["ไทรน้อย",14.0076,100.3092],["ปากเกร็ด",13.9244,100.497]]],["นราธิวาส","Narathiwat",[["เมืองนราธิวาส",6.3956,101.8132],["ตากใบ",6.2388,101.9996],["บาเจาะ",6.546,101.6474],["ยี่งอ",6.4173,101.6997],["ระแงะ",6.247,101.7082],["รือเสาะ",6.3784,101.5166],["ศรีสาคร",6.1884,101.5136],["แว้ง",5.8985,101.8667],["สุคิริน",5.9111,101.7363],["สุไหงโก-ลก",6.0792,101.9926],["สุไหงปาดี",6.1037,101.8912],["จะแนะ",6.0383,101.6119],["เจาะไอร้อง",6.2268,101.8406]]],["น่าน","Nan",[["เมืองน่าน",18.8856,100.6648],["แม่จริม",18.7174,101.1016],["บ้านหลวง",18.8457,100.4448],["นาน้อย",18.3218,100.749],["ปัว",19.1656,100.9932],["ท่าวังผา",19.1298,100.7485],["เวียงสา",18.566,100.7067],["ทุ่งช้าง",19.4659,100.9173],["เชียงกลาง",19.3017,100.8905],["นาหมื่น",18.1383,100.6334],["สันติสุข",18.9197,100.9857],["บ่อเกลือ",19.1024,101.1902],["สองแคว",19.405,100.6643],["ภูเพียง",18.7874,100.8657],["เฉลิมพระเกียรติ",19.5063,101.1326]]],["บึงกาฬ","Bueng Kan",[["เมืองบึงกาฬ",18.3111,103.6041],["พรเจริญ",18.0742,103.6481],["โซ่พิสัย",18.1448,103.4487],["เซกา",17.9871,103.9013],["ปากคาด",18.2811,103.3397],["บึงโขงหลง",18.03,104.0697],["ศรีวิไล",18.1559,103.7792],["บุ่งคล้า",18.2426,103.9662]]],["บุรีรัมย์","Buriram",[["เมืองบุรีรัมย์",14.942,103.059],["คูเมือง",15.2719,103.0379],["กระสัง",14.944,103.3168],["นางรอง",14.6346,102.761],["หนองกี่",14.7259,102.5567],["ละหานทราย",14.3338,102.885],["ประโคนชัย",14.6093,103.0614],["บ้านกรวด",14.3939,103.1099],["พุทไธสง",15.5325,102.9974],["ลำปลายมาศ",15.0158,102.8688],["สตึก",15.2251,103.3243],["ปะคำ",14.4042,102.667],["นาโพธิ์",15.6963,102.9379],["หนองหงส์",14.869,102.6593],["พลับพลาชัย",14.7299,103.1683],["ห้วยราช",15.003,103.2253],["โนนสุวรรณ",14.5592,102.5734],["ชำนิ",14.788,102.8291],["บ้านใหม่ไชยพจน์",15.5744,102.8487],["โนนดินแดง",14.2239,102.6791],["บ้านด่าน",15.122,103.1891],["แคนดง",15.3112,103.1272],["เฉลิมพระเกียรติ",14.5629,102.8926]]],["ปทุมธานี","Pathum Thani",[["เมืองปทุมธานี",13.9931,100.5355],["คลองหลวง",14.0943,100.6767],["ธัญบุรี",14.03,100.7621],["หนองเสือ",14.1614,100.8381],["ลาดหลุมแก้ว",14.0488,100.4073],["ลำลูกกา",13.9777,100.7901],["สามโคก",14.0826,100.5227]]],["ประจวบคีรีขันธ์","Prachuap Khiri Khan",[["เมืองประจวบคีรีขันธ์",11.8732,99.7204],["กุยบุรี",12.1133,99.7368],["ทับสะแก",11.5462,99.5649],["บางสะพาน",11.2905,99.4453],["บางสะพานน้อย",11.0646,99.3361],["ปราณบุรี",12.3919,99.7311],["หัวหิน",12.5153,99.7048],["สามร้อยยอด",12.2603,99.7274]]],["ปราจีนบุรี","Prachin Buri",[["เมืองปราจีนบุรี",14.0995,101.3859],["กบินทร์บุรี",13.8896,101.7891],["นาดี",14.1854,101.8535],["บ้านสร้าง",13.949,101.2475],["ประจันตคาม",14.2275,101.5554],["ศรีมหาโพธิ",13.8865,101.5402],["ศรีมโหสถ",13.8796,101.4208]]],["ปัตตานี","Pattani",[["เมืองปัตตานี",6.8523,101.2628],["โคกโพธิ์",6.7011,101.1232],["หนองจิก",6.8017,101.1641],["ปะนาเระ",6.8074,101.5155],["มายอ",6.7065,101.3999],["ทุ่งยางแดง",6.6387,101.4508],["สายบุรี",6.6978,101.5781],["ไม้แก่น",6.6144,101.6745],["ยะหริ่ง",6.8357,101.3902],["ยะรัง",6.698,101.3119],["กะพ้อ",6.607,101.5412],["แม่ลาน",6.6722,101.2328]]],["พระนครศรีอยุธยา","Phra Nakhon Si Ayutthaya",[["พระนครศรีอยุธยา",14.352,100.5603],["ท่าเรือ",14.5389,100.7075],["นครหลวง",14.4687,100.6254],["บางไทร",14.2143,100.4843],["บางบาล",14.3854,100.4656],["บางปะอิน",14.238,100.5944],["บางปะหัน",14.4736,100.5463],["ผักไห่",14.4528,100.3415],["ภาชี",14.4398,100.726],["ลาดบัวหลวง",14.169,100.3513],["วังน้อย",14.2457,100.7242],["เสนา",14.2952,100.3757],["บางซ้าย",14.3138,100.2955],["อุทัย",14.3572,100.6967],["มหาราช",14.5741,100.5372],["บ้านแพรก",14.6441,100.5472]]],["พะเยา","Phayao",[["เมืองพะเยา",19.1513,99.8668],["จุน",19.3678,100.1436],["เชียงคำ",19.4785,100.3503],["เชียงม่วน",18.9395,100.2875],["ดอกคำใต้",19.103,100.0563],["ปง",19.1883,100.3833],["แม่ใจ",19.3796,99.7974],["ภูซาง",19.6277,100.3656],["ภูกามยาว",19.3203,99.9678]]],["พังงา","Phang Nga",[["เมืองพังงา",8.4674,98.5134],["เกาะยาว",8.0446,98.5882],["กะปง",8.7402,98.4662],["ตะกั่วทุ่ง",8.2686,98.4122],["ตะกั่วป่า",8.8446,98.3263],["คุระบุรี",9.1584,98.3618],["ทับปุด",8.5313,98.6315],["ท้ายเหมือง",8.4927,98.3118]]],["พัทลุง","Phatthalung",[["เมืองพัทลุง",7.6158,100.1038],["กงหรา",7.4224,99.9511],["เขาชัยสน",7.4772,100.1278],["ตะโหมด",7.2846,100.0335],["ควนขนุน",7.7645,100.0603],["ปากพะยูน",7.3694,100.3181],["ศรีบรรพต",7.6875,99.8643],["ป่าบอน",7.2317,100.1355],["บางแก้ว",7.4251,100.188],["ป่าพะยอม",7.8256,99.8634],["ศรีนครินทร์",7.5628,99.9041]]],["พิจิตร","Phichit",[["เมืองพิจิตร",16.4113,100.3666],["วังทรายพูน",16.3784,100.5404],["โพธิ์ประทับช้าง",16.3163,100.1809],["ตะพานหิน",16.21,100.4103],["บางมูลนาก",16.0325,100.4272],["โพทะเล",16.063,100.2419],["สามง่าม",16.4507,100.1423],["ทับคล้อ",16.1933,100.5952],["สากเหล็ก",16.5059,100.508],["บึงนาราง",16.191,100.1328],["ดงเจริญ",16.0017,100.6158],["วชิรบารมี",16.5189,100.0972]]],["พิษณุโลก","Phitsanulok",[["เมืองพิษณุโลก",16.8371,100.2846],["นครไทย",17.105,100.865],["ชาติตระการ",17.3945,100.6732],["บางระกำ",16.726,100.0392],["บางกระทุ่ม",16.5966,100.3495],["พรหมพิราม",17.0782,100.1598],["วัดโบสถ์",17.1577,100.3658],["วังทอง",16.8223,100.5776],["เนินมะปราง",16.5852,100.7066]]],["ภูเก็ต","Phuket",[["เมืองภูเก็ต",7.8552,98.3599],["กะทู้",7.9172,98.3137],["ถลาง",8.0556,98.3458]]],["มหาสารคาม","Maha Sarakham",[["เมืองมหาสารคาม",16.1278,103.3083],["แกดำ",16.0512,103.3958],["โกสุมพิสัย",16.2453,102.9951],["กันทรวิชัย",16.2848,103.2673],["เชียงยืน",16.4128,103.0767],["บรบือ",15.9931,103.1234],["นาเชือก",15.8064,103.0419],["พยัคฆภูมิพิสัย",15.5279,103.2364],["วาปีปทุม",15.868,103.341],["นาดูน",15.7272,103.2377],["ยางสีสุราช",15.6538,103.0941],["กุดรัง",16.0455,102.9563],["ชื่นชม",16.5399,103.1426]]],["มุกดาหาร","Mukdahan",[["เมืองมุกดาหาร",16.5502,104.6283],["นิคมคำสร้อย",16.3529,104.5568],["ดอนตาล",16.2965,104.812],["ดงหลวง",16.7943,104.3503],["คำชะอี",16.6151,104.348],["หว้านใหญ่",16.7199,104.7266],["หนองสูง",16.4444,104.342]]],["ยะลา","Yala",[["เมืองยะลา",6.5532,101.2406],["เบตง",5.8622,101.2289],["บันนังสตา",6.2465,101.278],["ธารโต",6.0735,101.2553],["ยะหา",6.4233,101.1276],["รามัน",6.4904,101.4325],["กาบัง",6.3514,100.9853],["กรงปินัง",6.3965,101.2461]]],["ยโสธร","Yasothon",[["เมืองยโสธร",15.8479,104.1685],["ทรายมูล",15.9835,104.1958],["กุดชุม",16.0561,104.2876],["คำเขื่อนแก้ว",15.6493,104.3351],["ป่าติ้ว",15.8485,104.3927],["มหาชนะชัย",15.5141,104.2557],["ค้อวัง",15.3802,104.3431],["เลิงนกทา",16.2033,104.5227],["ไทยเจริญ",16.0858,104.4369]]],["ระนอง","Ranong",[["เมืองระนอง",9.8742,98.6113],["ละอุ่น",10.0813,98.7817],["กะเปอร์",9.5644,98.6202],["กระบุรี",10.4615,98.8461],["สุขสำราญ",9.4148,98.5208]]],["ระยอง","Rayong",[["เมืองระยอง",12.717,101.3479],["บ้านฉาง",12.7332,101.0482],["แกลง",12.7786,101.6547],["วังจันทร์",12.9659,101.5178],["บ้านค่าย",12.84,101.3421],["ปลวกแดง",12.9788,101.2509],["เขาชะเมา",12.9943,101.6784],["นิคมพัฒนา",12.8428,101.1487]]],["ราชบุรี","Ratchaburi",[["เมืองราชบุรี",13.5421,99.7672],["จอมบึง",13.6399,99.5194],["สวนผึ้ง",13.5507,99.2929],["ดำเนินสะดวก",13.5685,99.9679],["บ้านโป่ง",13.8199,99.8249],["บางแพ",13.6796,99.9783],["โพธาราม",13.7102,99.7532],["ปากท่อ",13.3642,99.6581],["วัดเพลง",13.4508,99.8642],["บ้านคา",13.3214,99.3869]]],["ร้อยเอ็ด","Roi Et",[["เมืองร้อยเอ็ด",16.0194,103.6096],["เกษตรวิสัย",15.6034,103.5627],["ปทุมรัตต์",15.6242,103.3827],["จตุรพักตรพิมาน",15.8291,103.5484],["ธวัชบุรี",16.0305,103.7748],["พนมไพร",15.6942,104.0729],["โพนทอง",16.2894,103.9635],["โพธิ์ชัย",16.3294,103.7979],["หนองพอก",16.3046,104.2167],["เสลภูมิ",16.051,103.9961],["สุวรรณภูมิ",15.608,103.8034],["เมืองสรวง",15.7878,103.7508],["โพนทราย",15.4941,103.9363],["อาจสามารถ",15.8394,103.8742],["เมยวดี",16.3017,104.0518],["ศรีสมเด็จ",16.0191,103.5063],["จังหาร",16.1656,103.6096],["เชียงขวัญ",16.1494,103.7436],["หนองฮี",15.5816,104.0089],["ทุ่งเขาหลวง",15.9943,103.8671]]],["ลพบุรี","Lopburi",[["เมืองลพบุรี",14.8261,100.6827],["พัฒนานิคม",14.9132,101.0204],["โคกสำโรง",15.0552,100.7678],["ชัยบาดาล",15.1996,101.1338],["ท่าวุ้ง",14.8293,100.5071],["บ้านหมี่",15.0617,100.5494],["ท่าหลวง",15.0547,101.1934],["สระโบสถ์",15.2315,100.873],["โคกเจริญ",15.4161,100.8465],["ลำสนธิ",15.4014,101.351],["หนองม่วง",15.2858,100.7001]]],["ลำปาง","Lampang",[["เมืองลำปาง",18.4116,99.5355],["แม่เมาะ",18.4053,99.8238],["เกาะคา",18.139,99.345],["เสริมงาม",18.0897,99.1598],["งาว",18.7574,99.927],["แจ้ห่ม",18.7509,99.65],["วังเหนือ",19.1466,99.6395],["เถิน",17.5665,99.2864],["แม่พริก",17.503,99.0536],["แม่ทะ",18.1051,99.5722],["สบปราบ",17.8966,99.3359],["ห้างฉัตร",18.3431,99.2759],["เมืองปาน",18.7926,99.4518]]],["ลำพูน","Lamphun",[["เมืองลำพูน",18.5523,99.0593],["แม่ทา",18.3809,99.0832],["บ้านโฮ่ง",18.267,98.8234],["ลี้",17.788,98.8845],["ทุ่งหัวช้าง",17.976,99.057],["ป่าซาง",18.4191,98.8867],["บ้านธิ",18.648,99.1597],["เวียงหนองล่อง",18.4151,98.7478]]],["ศรีสะเกษ","Sisaket",[["เมืองศรีสะเกษ",15.0876,104.3469],["ยางชุมน้อย",15.2395,104.3896],["กันทรารมย์",15.1259,104.5711],["กันทรลักษ์",14.5711,104.6702],["ขุขันธ์",14.7258,104.1885],["ไพรบึง",14.77,104.3454],["ปรางค์กู่",14.8539,104.0339],["ขุนหาญ",14.5371,104.4059],["ราษีไศล",15.3457,104.1822],["อุทุมพรพิสัย",15.1271,104.1603],["บึงบูรพ์",15.3049,104.0589],["ห้วยทับทัน",15.0204,104.036],["โนนคูณ",14.9065,104.6934],["ศรีรัตนะ",14.7996,104.4833],["น้ำเกลี้ยง",14.9196,104.5276],["วังหิน",14.9632,104.2126],["ภูสิงห์",14.4889,104.1464],["เมืองจันทร์",15.1849,104.0226],["เบญจลักษ์",14.7877,104.7129],["พยุห์",14.9081,104.3796],["โพธิ์ศรีสุวรรณ",15.2352,104.067],["ศิลาลาด",15.4843,104.0927]]],["สกลนคร","Sakon Nakhon",[["เมืองสกลนคร",17.1741,104.1021],["กุสุมาลย์",17.3564,104.2707],["กุดบาก",17.0855,103.8168],["พรรณานิคม",17.3162,103.8943],["พังโคน",17.3883,103.7502],["วาริชภูมิ",17.2566,103.6094],["นิคมน้ำอูน",17.1694,103.7293],["วานรนิวาส",17.6288,103.7376],["คำตากล้า",17.8289,103.7866],["บ้านม่วง",17.901,103.5265],["อากาศอำนวย",17.6417,103.9719],["สว่างแดนดิน",17.461,103.4476],["ส่องดาว",17.313,103.4408],["เต่างอย",16.9414,104.1504],["โคกศรีสุพรรณ",17.0255,104.2956],["เจริญศิลป์",17.6409,103.5315],["โพนนาแก้ว",17.2139,104.3072],["ภูพาน",16.936,103.9288]]],["สงขลา","Songkhla",[["เมืองสงขลา",7.1213,100.5982],["สทิงพระ",7.4858,100.411],["จะนะ",6.8976,100.7036],["นาทวี",6.6399,100.6757],["เทพา",6.7893,100.91],["สะบ้าย้อย",6.5296,100.909],["ระโนด",7.7924,100.2947],["กระแสสินธุ์",7.6098,100.2947],["รัตภูมิ",7.0767,100.1948],["สะเดา",6.673,100.4294],["หาดใหญ่",6.9718,100.4251],["นาหม่อม",6.9504,100.5683],["ควนเนียง",7.1851,100.3856],["บางกล่ำ",7.0631,100.4028],["สิงหนคร",7.2679,100.4884],["คลองหอยโข่ง",6.8576,100.3414]]],["สตูล","Satun",[["เมืองสตูล",6.6228,99.9205],["ควนโดน",6.7712,100.1198],["ควนกาหลง",6.9207,100.0512],["ท่าแพ",6.7988,99.9162],["ละงู",6.915,99.7945],["ทุ่งหว้า",7.082,99.8299],["มะนัง",7.0049,99.9303]]],["สมุทรปราการ","Samut Prakan",[["เมืองสมุทรปราการ",13.5689,100.6517],["บางบ่อ",13.5844,100.8646],["บางพลี",13.6257,100.7271],["พระประแดง",13.6536,100.5535],["พระสมุทรเจดีย์",13.5537,100.5158],["บางเสาธง",13.6388,100.8115]]],["สมุทรสงคราม","Samut Songkhram",[["เมืองสมุทรสงคราม",13.3996,99.9987],["บางคนที",13.4767,99.9489],["อัมพวา",13.3641,99.9089]]],["สมุทรสาคร","Samut Sakhon",[["เมืองสมุทรสาคร",13.5309,100.2519],["กระทุ่มแบน",13.6588,100.2731],["บ้านแพ้ว",13.5899,100.1174]]],["สระบุรี","Saraburi",[["เมืองสระบุรี",14.4987,100.9266],["แก่งคอย",14.5606,101.0631],["หนองแค",14.3683,100.8647],["วิหารแดง",14.3463,100.9798],["หนองแซง",14.4841,100.8037],["บ้านหมอ",14.6109,100.7184],["ดอนพุด",14.609,100.615],["หนองโดน",14.6993,100.703],["พระพุทธบาท",14.7218,100.8173],["เสาไห้",14.5751,100.8386],["มวกเหล็ก",14.7941,101.2775],["วังม่วง",14.8219,101.1398],["เฉลิมพระเกียรติ",14.6605,100.9106]]],["สระแก้ว","Sa Kaeo",[["เมืองสระแก้ว",13.9288,102.1041],["คลองหาด",13.4766,102.2775],["ตาพระยา",14.047,102.7208],["วังน้ำเย็น",13.5163,102.0795],["วัฒนานคร",13.8937,102.3614],["อรัญประเทศ",13.692,102.4774],["เขาฉกรรจ์",13.6259,102.0248],["โคกสูง",13.8482,102.6415],["วังสมบูรณ์",13.3652,102.1184]]],["สิงห์บุรี","Sing Buri",[["เมืองสิงห์บุรี",14.9096,100.4022],["บางระจัน",14.8963,100.2771],["ค่ายบางระจัน",14.8212,100.3056],["พรหมบุรี",14.7844,100.4461],["ท่าช้าง",14.7802,100.3909],["อินทร์บุรี",15.0219,100.3495]]],["สุพรรณบุรี","Suphan Buri",[["เมืองสุพรรณบุรี",14.4894,100.067],["เดิมบางนางบวช",14.877,100.0313],["ด่านช้าง",14.8832,99.5083],["บางปลาม้า",14.3523,100.1469],["ศรีประจันต์",14.6321,100.1486],["ดอนเจดีย์",14.6474,99.9407],["สองพี่น้อง",14.1939,99.9902],["สามชุก",14.7565,100.0654],["อู่ทอง",14.4141,99.8856],["หนองหญ้าไซ",14.7821,99.8537]]],["สุราษฎร์ธานี","Surat Thani",[["เมืองสุราษฎร์ธานี",9.0995,99.3247],["กาญจนดิษฐ์",9.0721,99.5438],["ดอนสัก",9.2036,99.6903],["เกาะสมุย",9.5055,99.9585],["เกาะพะงัน",9.7443,100.0252],["ไชยา",9.442,99.0675],["ท่าชนะ",9.601,98.9926],["คีรีรัฐนิคม",9.0121,98.9322],["บ้านตาขุน",9.0987,98.6666],["พนม",8.8029,98.7007],["ท่าฉาง",9.3436,98.9435],["บ้านนาสาร",8.8133,99.4025],["บ้านนาเดิม",8.8993,99.2731],["เคียนซา",8.742,99.1148],["เวียงสระ",8.6002,99.3561],["พระแสง",8.555,99.1168],["พุนพิน",9.0292,99.1444],["ชัยบุรี",8.4515,99.071],["วิภาวดี",9.2424,98.8465]]],["สุรินทร์","Surin",[["เมืองสุรินทร์",14.8849,103.5091],["ชุมพลบุรี",15.3847,103.3669],["ท่าตูม",15.3098,103.6442],["จอมพระ",15.1389,103.5834],["ปราสาท",14.6286,103.4106],["กาบเชิง",14.4725,103.5667],["รัตนบุรี",15.3403,103.9026],["สนม",15.1793,103.7815],["ศีขรภูมิ",14.9496,103.7812],["สังขะ",14.5657,103.8305],["ลำดวน",14.7163,103.6913],["สำโรงทาบ",15.0446,103.9419],["บัวเชด",14.4792,103.9781],["พนมดงรัก",14.4284,103.3085],["ศรีณรงค์",14.7784,103.884],["เขวาสินรินทร์",15.0062,103.6152],["โนนนารายณ์",15.1944,103.9069]]],["สุโขทัย","Sukhothai",[["เมืองสุโขทัย",17.0248,99.7759],["บ้านด่านลานหอย",17.0595,99.4909],["คีรีมาศ",16.8336,99.7348],["กงไกรลาศ",16.94,99.9753],["ศรีสัชนาลัย",17.6002,99.7045],["ศรีสำโรง",17.1636,99.7397],["สวรรคโลก",17.301,99.8348],["ศรีนคร",17.3829,99.9671],["ทุ่งเสลี่ยม",17.3568,99.5524]]],["หนองคาย","Nong Khai",[["เมืองหนองคาย",17.8358,102.7922],["ท่าบ่อ",17.7981,102.5637],["โพนพิสัย",17.952,103.1253],["ศรีเชียงใหม่",17.9373,102.5015],["สังคม",18.0644,102.2151],["สระใคร",17.6656,102.7017],["เฝ้าไร่",18.0046,103.299],["รัตนวาปี",18.1925,103.2386],["โพธิ์ตาก",17.8898,102.4278]]],["หนองบัวลำภู","Nong Bua Lamphu",[["เมืองหนองบัวลำภู",17.1665,102.3991],["นากลาง",17.3276,102.2065],["โนนสัง",16.9066,102.5286],["ศรีบุญเรือง",17.0062,102.2075],["สุวรรณคูหา",17.5504,102.2463],["นาวัง",17.3585,102.0587]]],["อำนาจเจริญ","Amnat Charoen",[["เมืองอำนาจเจริญ",15.8817,104.6376],["ชานุมาน",16.1258,104.9229],["ปทุมราชวงศา",15.8979,104.8979],["พนา",15.6727,104.8535],["เสนางคนิคม",16.0532,104.6828],["หัวตะพาน",15.6793,104.5232],["ลืออำนาจ",15.7115,104.706]]],["อุดรธานี","Udon Thani",[["เมืองอุดรธานี",17.3937,102.7885],["กุดจับ",17.4432,102.5336],["หนองวัวซอ",17.195,102.5883],["กุมภวาปี",17.0916,102.9907],["โนนสะอาด",16.9505,102.8966],["หนองหาน",17.3629,103.1024],["ทุ่งฝน",17.5024,103.2114],["ไชยวาน",17.2213,103.2746],["ศรีธาตุ",17.0367,103.2261],["วังสามหมอ",17.0479,103.4572],["บ้านดุง",17.7085,103.2617],["บ้านผือ",17.6764,102.445],["น้ำโสม",17.7473,102.1796],["เพ็ญ",17.6645,102.9288],["สร้างคอม",17.7903,103.0505],["หนองแสง",17.1449,102.7815],["นายูง",17.9321,102.1305],["พิบูลย์รักษ์",17.526,103.0663],["กู่แก้ว",17.1621,103.1629],["ประจักษ์ศิลปาคม",17.2445,102.9905]]],["อุตรดิตถ์","Uttaradit",[["เมืองอุตรดิตถ์",17.6827,100.1908],["ตรอน",17.4684,100.1335],["ท่าปลา",17.8642,100.4708],["น้ำปาด",17.704,100.7287],["ฟากท่า",18.004,100.8763],["บ้านโคก",18.1383,101.0575],["พิชัย",17.2963,100.1078],["ลับแล",17.661,100.0124],["ทองแสนขัน",17.4933,100.3938]]],["อุทัยธานี","Uthai Thani",[["เมืองอุทัยธานี",15.3989,100.0226],["ทัพทัน",15.4919,99.8225],["สว่างอารมณ์",15.6034,99.7616],["หนองฉาง",15.3695,99.7677],["หนองขาหย่าง",15.3491,99.9439],["บ้านไร่",15.227,99.3316],["ลานสัก",15.5149,99.4143],["ห้วยคต",15.3025,99.5312]]],["อุบลราชธานี","Ubon Ratchathani",[["เมืองอุบลราชธานี",15.3004,104.8285],["ศรีเมืองใหม่",15.563,105.3545],["โขงเจียม",15.4538,105.501],["เขื่องใน",15.394,104.5342],["เขมราฐ",15.9727,105.1524],["เดชอุดม",14.8493,105.0735],["นาจะหลวย",14.5649,105.2282],["น้ำยืน",14.4395,105.0681],["บุณฑริก",14.7083,105.4019],["ตระการพืชผล",15.6153,105.0647],["กุดข้าวปุ้น",15.8168,105.0396],["ม่วงสามสิบ",15.526,104.7207],["วารินชำราบ",15.1215,104.8585],["พิบูลมังสาหาร",15.1498,105.2367],["ตาลสุม",15.3895,105.1521],["โพธิ์ไทร",15.7651,105.3419],["สำโรง",14.98,104.7901],["ดอนมดแดง",15.383,105.0161],["สิรินธร",15.1108,105.4357],["ทุ่งศรีอุดม",14.7406,104.9168],["นาเยีย",15.0499,105.0584],["นาตาล",15.9329,105.2821],["เหล่าเสือโก้ก",15.4405,104.9098],["สว่างวีระวงศ์",15.2353,105.0695],["น้ำขุ่น",14.5668,104.8942]]],["อ่างทอง","Ang Thong",[["เมืองอ่างทอง",14.5791,100.443],["ไชโย",14.6737,100.465],["ป่าโมก",14.4893,100.453],["โพธิ์ทอง",14.6774,100.344],["แสวงหา",14.7487,100.2863],["วิเศษชัยชาญ",14.5546,100.3125],["สามโก้",14.6046,100.2533]]],["เชียงราย","Chiang Rai",[["เมืองเชียงราย",19.9163,99.7731],["เวียงชัย",19.8667,99.9929],["เชียงของ",20.1514,100.3436],["เทิง",19.6936,100.1972],["พาน",19.5602,99.7507],["ป่าแดด",19.5063,99.9779],["แม่จัน",20.163,99.8479],["เชียงแสน",20.2803,100.1419],["แม่สาย",20.3644,99.9115],["แม่สรวย",19.6931,99.4746],["เวียงป่าเป้า",19.2848,99.4358],["พญาเม็งราย",19.8792,100.1535],["เวียงแก่น",20.0053,100.4724],["ขุนตาล",19.8757,100.2794],["แม่ฟ้าหลวง",20.2506,99.6597],["แม่ลาว",19.7757,99.6988],["เวียงเชียงรุ้ง",20.0168,100.0592],["ดอยหลวง",20.1386,100.1522]]],["เชียงใหม่","Chiang Mai",[["เมืองเชียงใหม่",18.7908,98.9556],["จอมทอง",18.3716,98.6037],["แม่แจ่ม",18.6084,98.3062],["เชียงดาว",19.5051,98.9097],["ดอยสะเก็ด",18.9393,99.2165],["แม่แตง",19.1804,98.8509],["แม่ริม",18.9412,98.8785],["สะเมิง",18.9095,98.636],["ฝาง",19.8855,99.1626],["แม่อาย",20.0006,99.328],["พร้าว",19.2937,99.2184],["สันป่าตอง",18.6063,98.8773],["สันกำแพง",18.7345,99.1634],["สันทราย",18.9552,99.0307],["หางดง",18.7349,98.8795],["ฮอด",18.1138,98.4764],["ดอยเต่า",17.9059,98.6749],["อมก๋อย",17.6805,98.3358],["สารภี",18.6979,99.0196],["เวียงแหง",19.5888,98.6627],["ไชยปราการ",19.6806,99.1729],["แม่วาง",18.6659,98.6548],["แม่ออน",18.7439,99.2984],["ดอยหล่อ",18.5325,98.7537],["กัลยาณิวัฒนา",19.0118,98.3183]]],["เพชรบุรี","Phetchaburi",[["เมืองเพชรบุรี",13.0813,99.9689],["เขาย้อย",13.2435,99.8049],["หนองหญ้าปล้อง",13.1282,99.4746],["ชะอำ",12.7576,99.9004],["ท่ายาง",12.8167,99.7906],["บ้านลาด",13.0468,99.8494],["บ้านแหลม",13.1755,99.9842],["แก่งกระจาน",12.8595,99.4636]]],["เพชรบูรณ์","Phetchabun",[["เมืองเพชรบูรณ์",16.383,101.182],["ชนแดน",16.1248,100.8291],["หล่มสัก",16.7284,101.3115],["หล่มเก่า",16.9916,101.2776],["วิเชียรบุรี",15.6598,101.0984],["ศรีเทพ",15.4417,101.1373],["หนองไผ่",16.0216,101.1379],["บึงสามพัน",15.8296,101.0026],["น้ำหนาว",16.8459,101.5894],["วังโป่ง",16.3505,100.8055],["เขาค้อ",16.6546,100.9887]]],["เลย","Loei",[["เมืองเลย",17.5429,101.7191],["นาด้วง",17.5423,101.9959],["เชียงคาน",17.8266,101.7333],["ปากชม",17.9124,101.9572],["ด่านซ้าย",17.2313,101.2181],["นาแห้ว",17.4419,100.9946],["ภูเรือ",17.4028,101.3911],["ท่าลี่",17.6173,101.4393],["วังสะพุง",17.2742,101.7136],["ภูกระดึง",16.8947,101.8401],["ภูหลวง",17.0979,101.6232],["ผาขาว",17.0493,102.0122],["เอราวัณ",17.2872,101.9745],["หนองหิน",17.0739,101.8201]]],["แพร่","Phrae",[["เมืองแพร่",18.1149,100.2461],["ร้องกวาง",18.3333,100.3783],["ลอง",18.1324,99.8874],["สูงเม่น",18.0377,100.1235],["เด่นชัย",17.9197,100.0192],["สอง",18.5778,100.2142],["วังชิ้น",17.863,99.6373],["หนองม่วงไข่",18.2944,100.1596]]],["แม่ฮ่องสอน","Mae Hong Son",[["เมืองแม่ฮ่องสอน",19.265,98.005],["ขุนยวม",18.8316,97.9025],["ปาย",19.3258,98.4193],["แม่สะเรียง",18.2802,97.7834],["แม่ลาน้อย",18.4807,97.9823],["สบเมย",17.9137,97.9643],["ปางมะผ้า",19.5847,98.1964]]]];
+</script>
+<script>
+/* ===== Random numbers (seeded, reproducible like rng(42)) ===== */
+function makeRng(seed) {
+  let s = seed >>> 0;
+  const uni = () => {
+    s = (s + 0x6D2B79F5) >>> 0;
+    let t = s;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+  let spare = null;
+  const randn = () => {
+    if (spare !== null) { const v = spare; spare = null; return v; }
+    let u = 0, v = 0;
+    while (u === 0) u = uni();
+    v = uni();
+    const r = Math.sqrt(-2 * Math.log(u));
+    spare = r * Math.sin(2 * Math.PI * v);
+    return r * Math.cos(2 * Math.PI * v);
+  };
+  return { uni, randn };
+}
+
+/* ===== Solar geometry (NOAA general solar position, Thailand clock UTC+7) ===== */
+const TZ = 7;
+function dayOfYear(y, m, d) {
+  return Math.round((Date.UTC(y, m - 1, d) - Date.UTC(y, 0, 1)) / 86400000) + 1;
+}
+function solarGeom(lat, lon, y, m, d, hrLocal) {
+  const leap = (y % 4 === 0 && y % 100 !== 0) || y % 400 === 0;
+  const g = 2 * Math.PI / (leap ? 366 : 365) * (dayOfYear(y, m, d) - 1 + (hrLocal - TZ - 12) / 24);
+  const eqt = 229.18 * (0.000075 + 0.001868 * Math.cos(g) - 0.032077 * Math.sin(g)
+    - 0.014615 * Math.cos(2 * g) - 0.040849 * Math.sin(2 * g));
+  const decl = 0.006918 - 0.399912 * Math.cos(g) + 0.070257 * Math.sin(g)
+    - 0.006758 * Math.cos(2 * g) + 0.000907 * Math.sin(2 * g)
+    - 0.002697 * Math.cos(3 * g) + 0.00148 * Math.sin(3 * g);
+  const tst = hrLocal * 60 + eqt + 4 * lon - 60 * TZ;
+  const ha = (tst / 4 - 180) * Math.PI / 180;
+  const phi = lat * Math.PI / 180;
+  const cosZ = Math.sin(phi) * Math.sin(decl) + Math.cos(phi) * Math.cos(decl) * Math.cos(ha);
+  // sunrise / sunset / noon (local clock hours)
+  const c0 = Math.cos(90.833 * Math.PI / 180) / (Math.cos(phi) * Math.cos(decl)) - Math.tan(phi) * Math.tan(decl);
+  const ha0 = Math.acos(Math.max(-1, Math.min(1, c0))) * 180 / Math.PI;
+  const noon = (720 - 4 * lon - eqt + 60 * TZ) / 60;
+  return { cosZ, noon, rise: noon - ha0 / 15, set: noon + ha0 / 15 };
+}
+// Haurwitz clear-sky global horizontal irradiance, W/m^2
+function clearSkyGHI(cosZ) {
+  return cosZ > 0.01 ? 1098 * cosZ * Math.exp(-0.057 / cosZ) : 0;
+}
+
+/* ===== Dataset: port of MATLAB section 2 ===== */
+// opts: {lat, lon, trafo, pv, target, start:{y,m,d}, days, cloud (0..1), ghi (optional Float64Array W/m2 per sample)}
+function buildDataset(o) {
+  const step = 15, perDay = 96, n = o.days * perDay;
+  const rng = makeRng(42);
+  const rows = [];
+  const sun = new Float64Array(n);
+  const base = Date.UTC(o.start.y, o.start.m - 1, o.start.d);
+  // cloud model: daily clearness + AR(1) intra-day flicker (dry-season Thailand is mostly clear)
+  let ar = 0, dayClear = 1;
+  for (let k = 0; k < n; k++) {
+    const day = Math.floor(k / perDay), slot = k % perDay;
+    const dt = new Date(base + day * 86400000);
+    const y = dt.getUTCFullYear(), m = dt.getUTCMonth() + 1, d = dt.getUTCDate();
+    const hr = slot * step / 60;
+    rows.push({ y, m, d, slot, hour: hr });
+    if (o.ghi) { sun[k] = Math.max(0, o.ghi[k]) / 1000; continue; }
+    const cz = solarGeom(o.lat, o.lon, y, m, d, hr + step / 120).cosZ; // mid-interval
+    if (slot === 0) dayClear = 1 - o.cloud * 0.6 * rng.uni();
+    ar = 0.85 * ar + 0.15 * rng.randn();
+    const kt = Math.min(1, Math.max(0.05, dayClear - o.cloud * 0.35 * Math.abs(ar)));
+    sun[k] = clearSkyGHI(cz) / 1000 * kt;
+  }
+  const loadNoise = new Float64Array(n), vNoise = new Float64Array(n);
+  for (let k = 0; k < n; k++) loadNoise[k] = rng.randn();
+  for (let k = 0; k < n; k++) vNoise[k] = rng.randn();
+  const T = o.trafo, P = o.pv, V = o.target;
+  for (let k = 0; k < n; k++) {
+    const r = rows[k], hr = r.hour;
+    r.sunlight = sun[k];
+    r.solar_kw = sun[k] * P;
+    r.load_kw = T * 0.3 + T * 0.1 * Math.sin(2 * Math.PI * (hr - 14) / 24) + loadNoise[k] * 5;
+    r.v22 = 22100 + r.solar_kw * 0.1 * (P / T) - r.load_kw * 0.05;
+    r.voltage = V + (r.solar_kw / T * 60) - ((r.load_kw - T * 0.3) / T * 25) + vNoise[k] * 1.5;
+  }
+  for (let k = 0; k < n; k++) {
+    rows[k].v_lag_1h = k >= 4 ? rows[k - 4].voltage : NaN;
+    rows[k].v_lag_2h = k >= 8 ? rows[k - 8].voltage : NaN;
+    rows[k].v_lag_4h = k >= 16 ? rows[k - 16].voltage : NaN;
+  }
+  // rmmissing, then start at the first midnight
+  let first = 16;
+  while (first < n && rows[first].slot !== 0) first++;
+  return rows.slice(first);
+}
+
+const FEATURES = ['hour', 'solar_kw', 'load_kw', 'v_lag_1h', 'v_lag_2h', 'v_lag_4h'];
+
+/* ===== LSTM regression network (sequenceInput -> lstm -> fc(1)) ===== */
+class LSTMNet {
+  constructor(F, H, rng) {
+    this.F = F; this.H = H;
+    const G = 4 * H;
+    this.W = new Float64Array(G * F); // input weights
+    this.U = new Float64Array(G * H); // recurrent weights
+    this.b = new Float64Array(G);
+    this.V = new Float64Array(H);     // fc weights
+    this.c0 = new Float64Array(1);    // fc bias
+    const lw = Math.sqrt(6 / (F + G)), lu = Math.sqrt(6 / (H + G)), lv = Math.sqrt(6 / (H + 1));
+    for (let i = 0; i < this.W.length; i++) this.W[i] = (rng.uni() * 2 - 1) * lw;
+    for (let i = 0; i < this.U.length; i++) this.U[i] = (rng.uni() * 2 - 1) * lu;
+    for (let i = 0; i < this.V.length; i++) this.V[i] = (rng.uni() * 2 - 1) * lv;
+    for (let j = H; j < 2 * H; j++) this.b[j] = 1; // unit forget gate bias
+    this.params = [this.W, this.U, this.b, this.V, this.c0];
+    this.m = this.params.map(p => new Float64Array(p.length));
+    this.v = this.params.map(p => new Float64Array(p.length));
+    this.t = 0;
+  }
+  // X: array of Float64Array(F) per time step. Returns predictions (and cache when training)
+  forward(X, keep) {
+    const { F, H, W, U, b, V } = this, G = 4 * H, T = X.length;
+    let h = new Float64Array(H), c = new Float64Array(H);
+    const out = new Float64Array(T);
+    const cache = keep ? [] : null;
+    const z = new Float64Array(G);
+    for (let t = 0; t < T; t++) {
+      const x = X[t];
+      for (let g = 0; g < G; g++) {
+        let s = b[g];
+        const wo = g * F, uo = g * H;
+        for (let f = 0; f < F; f++) s += W[wo + f] * x[f];
+        for (let k = 0; k < H; k++) s += U[uo + k] * h[k];
+        z[g] = s;
+      }
+      const ig = new Float64Array(H), fg = new Float64Array(H), gg = new Float64Array(H), og = new Float64Array(H);
+      const cn = new Float64Array(H), hn = new Float64Array(H), tc = new Float64Array(H);
+      let y = this.c0[0];
+      for (let k = 0; k < H; k++) {
+        ig[k] = 1 / (1 + Math.exp(-z[k]));
+        fg[k] = 1 / (1 + Math.exp(-z[H + k]));
+        gg[k] = Math.tanh(z[2 * H + k]);
+        og[k] = 1 / (1 + Math.exp(-z[3 * H + k]));
+        cn[k] = fg[k] * c[k] + ig[k] * gg[k];
+        tc[k] = Math.tanh(cn[k]);
+        hn[k] = og[k] * tc[k];
+        y += V[k] * hn[k];
+      }
+      out[t] = y;
+      if (keep) cache.push({ x, hp: h, cp: c, ig, fg, gg, og, tc, h: hn });
+      h = hn; c = cn;
+    }
+    return { out, cache };
+  }
+  // accumulate gradients of half-MSE for one sequence; returns summed squared error
+  backward(X, Y, grads, norm) {
+    const { F, H, W, U, V } = this, G = 4 * H, T = X.length;
+    const { out, cache } = this.forward(X, true);
+    const [gW, gU, gb, gV, gc] = grads;
+    let dhn = new Float64Array(H), dcn = new Float64Array(H), sse = 0;
+    const dz = new Float64Array(G);
+    for (let t = T - 1; t >= 0; t--) {
+      const s = cache[t], e = out[t] - Y[t];
+      sse += e * e;
+      const dy = e / norm;
+      gc[0] += dy;
+      for (let k = 0; k < H; k++) gV[k] += dy * s.h[k];
+      const dcPrev = new Float64Array(H);
+      for (let k = 0; k < H; k++) {
+        const dh = V[k] * dy + dhn[k];
+        const dc = dh * s.og[k] * (1 - s.tc[k] * s.tc[k]) + dcn[k];
+        dz[k] = dc * s.gg[k] * s.ig[k] * (1 - s.ig[k]);
+        dz[H + k] = dc * s.cp[k] * s.fg[k] * (1 - s.fg[k]);
+        dz[2 * H + k] = dc * s.ig[k] * (1 - s.gg[k] * s.gg[k]);
+        dz[3 * H + k] = dh * s.tc[k] * s.og[k] * (1 - s.og[k]);
+        dcPrev[k] = dc * s.fg[k];
+      }
+      const dhPrev = new Float64Array(H);
+      for (let g = 0; g < G; g++) {
+        const d = dz[g];
+        if (d === 0) continue;
+        gb[g] += d;
+        const wo = g * F, uo = g * H;
+        for (let f = 0; f < F; f++) gW[wo + f] += d * s.x[f];
+        for (let k = 0; k < H; k++) { gU[uo + k] += d * s.hp[k]; dhPrev[k] += U[uo + k] * d; }
+      }
+      dhn = dhPrev; dcn = dcPrev;
+    }
+    return sse;
+  }
+  adamStep(grads, lr, clip) {
+    let sq = 0;
+    for (const g of grads) for (let i = 0; i < g.length; i++) sq += g[i] * g[i];
+    const nrm = Math.sqrt(sq), sc = nrm > clip ? clip / nrm : 1;
+    this.t++;
+    const b1 = 0.9, b2 = 0.999, eps = 1e-8;
+    const c1 = 1 - Math.pow(b1, this.t), c2 = 1 - Math.pow(b2, this.t);
+    this.params.forEach((p, j) => {
+      const g = grads[j], m = this.m[j], v = this.v[j];
+      for (let i = 0; i < p.length; i++) {
+        const gi = g[i] * sc;
+        m[i] = b1 * m[i] + (1 - b1) * gi;
+        v[i] = b2 * v[i] + (1 - b2) * gi * gi;
+        p[i] -= lr * (m[i] / c1) / (Math.sqrt(v[i] / c2) + eps);
+      }
+    });
+  }
+  zeroGrads() { return this.params.map(p => new Float64Array(p.length)); }
+}
+
+/* ===== Train / test split + standardization (MATLAB section 3) ===== */
+function prepare(rows) {
+  const approx = Math.round(0.8 * rows.length);
+  const mids = [];
+  rows.forEach((r, i) => { if (r.slot === 0) mids.push(i); });
+  let split = mids[0], best = Infinity;
+  for (const m of mids) { const d = Math.abs(m - approx); if (d < best) { best = d; split = m; } }
+  const train = rows.slice(0, split), test = rows.slice(split);
+  const F = FEATURES.length;
+  const mu = new Float64Array(F), sig = new Float64Array(F);
+  FEATURES.forEach((f, j) => {
+    let s = 0; for (const r of train) s += r[f]; mu[j] = s / train.length;
+    let q = 0; for (const r of train) q += (r[f] - mu[j]) ** 2;
+    sig[j] = Math.sqrt(q / (train.length - 1)) || 1;
+  });
+  let sy = 0; for (const r of train) sy += r.voltage;
+  const muY = sy / train.length;
+  let qy = 0; for (const r of train) qy += (r.voltage - muY) ** 2;
+  const sigY = Math.sqrt(qy / (train.length - 1)) || 1;
+  const norm = set => set.map(r => Float64Array.from(FEATURES, (f, j) => (r[f] - mu[j]) / sig[j]));
+  return { split, train, test, Xtr: norm(train), Xte: norm(test), Ytr: train.map(r => (r.voltage - muY) / sigY), muY, sigY };
+}
+
+// Truncated BPTT over one-day windows, mini-batched. onEpoch(ep, loss) may return a promise (UI yield)
+async function trainLSTM(P, cfg, onEpoch) {
+  const rng = makeRng(7);
+  const net = new LSTMNet(FEATURES.length, cfg.hidden, rng);
+  const win = 96, chunks = [];
+  for (let s = 0; s + 8 <= P.Xtr.length; s += win) chunks.push([s, Math.min(s + win, P.Xtr.length)]);
+  const dropAt = Math.round(cfg.epochs * 2 / 3);
+  const batch = 4, history = [];
+  for (let ep = 1; ep <= cfg.epochs; ep++) {
+    const lr = cfg.lr * (ep > dropAt ? 0.2 : 1);
+    for (let i = chunks.length - 1; i > 0; i--) { const j = Math.floor(rng.uni() * (i + 1)); [chunks[i], chunks[j]] = [chunks[j], chunks[i]]; }
+    let sse = 0, cnt = 0;
+    for (let bi = 0; bi < chunks.length; bi += batch) {
+      const grads = net.zeroGrads();
+      const group = chunks.slice(bi, bi + batch);
+      const N = group.reduce((a, [s, e]) => a + e - s, 0);
+      for (const [s, e] of group) sse += net.backward(P.Xtr.slice(s, e), P.Ytr.slice(s, e), grads, N);
+      cnt += N;
+      net.adamStep(grads, lr, 1);
+    }
+    const rmseV = Math.sqrt(sse / cnt) * P.sigY;
+    history.push(rmseV);
+    if (onEpoch && (await onEpoch(ep, rmseV)) === false) break;
+  }
+  return { net, history };
+}
+
+function predictVolts(net, X, P) {
+  return Array.from(net.forward(X, false).out, y => y * P.sigY + P.muY);
+}
+
+
+</script>
+<script>
+"use strict";
+const $ = id => document.getElementById(id);
+const pad2 = n => String(n).padStart(2, "0");
+const fmtHM = h => { const m = Math.round(h * 60); return pad2(Math.floor(m / 60) % 24) + ":" + pad2(m % 60); };
+const TH_MONTH = ["ม.ค.", "ก.พ.", "มี.ค.", "เม.ย.", "พ.ค.", "มิ.ย.", "ก.ค.", "ส.ค.", "ก.ย.", "ต.ค.", "พ.ย.", "ธ.ค."];
+const fmtDay = r => `${r.d} ${TH_MONTH[r.m - 1]} ${String((r.y + 543) % 100).padStart(2, "0")}`;
+const cssVar = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+const TAP_STEPS = [-0.05, -0.025, 0, 0.025, 0.05];
+const TAP_LABELS = ["Tap 1", "Tap 2", "Tap 3", "Tap 4", "Tap 5"];
+const SAMPLE_MIN = 15;
+
+/* ================= Canvas charts ================= */
+const charts = [];
+function niceTicks(lo, hi, count) {
+  const span = hi - lo || 1, raw = span / count, mag = Math.pow(10, Math.floor(Math.log10(raw)));
+  const step = [1, 2, 2.5, 5, 10].map(s => s * mag).find(s => span / s <= count) || 10 * mag;
+  const out = [];
+  for (let v = Math.ceil(lo / step) * step; v <= hi + 1e-9; v += step) out.push(+v.toFixed(10));
+  return { ticks: out, step };
+}
+function withAlpha(color, a) {
+  if (a >= 1) return color;
+  const c = document.createElement("canvas").getContext("2d");
+  c.fillStyle = color; const hex = c.fillStyle;
+  if (hex.startsWith("#")) {
+    const n = parseInt(hex.slice(1), 16);
+    return `rgba(${n >> 16 & 255},${n >> 8 & 255},${n & 255},${a})`;
+  }
+  return hex.replace(/rgba?\(([^)]+)\)/, (m, p) => { const q = p.split(",").slice(0, 3); return `rgba(${q.join(",")},${a})`; });
+}
+class Chart {
+  constructor(canvas, group) {
+    this.cv = canvas; this.ctx = canvas.getContext("2d"); this.group = group; this.hover = -1; this.spec = null;
+    new ResizeObserver(() => this.draw()).observe(canvas.parentElement);
+    const move = e => {
+      if (!this.spec || this.spec.type === "bar") return;
+      const r = this.cv.getBoundingClientRect(), x = e.clientX - r.left;
+      const idx = this.indexAt(x);
+      for (const c of charts) if (c.group && c.group === this.group) { c.hover = idx; c.draw(); }
+      if (!this.group) { this.hover = idx; this.draw(); }
+    };
+    canvas.addEventListener("pointermove", move);
+    canvas.addEventListener("pointerdown", move);
+    canvas.addEventListener("pointerleave", () => {
+      for (const c of charts) if (c === this || (c.group && c.group === this.group)) { c.hover = -1; c.draw(); }
+    });
+    charts.push(this);
+  }
+  set(spec) { this.spec = spec; this.hover = -1; this.draw(); }
+  indexAt(x) {
+    const s = this.spec, L = this.box;
+    if (!L || x < L.l || x > L.r) return -1;
+    const xv = s.xMin + (x - L.l) / (L.r - L.l) * (s.xMax - s.xMin);
+    let best = -1, bd = Infinity;
+    s.x.forEach((v, i) => { const d = Math.abs(v - xv); if (d < bd) { bd = d; best = i; } });
+    return best;
+  }
+  draw() {
+    const s = this.spec; if (!s) return;
+    const dpr = window.devicePixelRatio || 1, W = this.cv.parentElement.clientWidth, H = this.cv.parentElement.clientHeight;
+    if (!W || !H) return;
+    this.cv.width = Math.round(W * dpr); this.cv.height = Math.round(H * dpr);
+    const g = this.ctx; g.setTransform(dpr, 0, 0, dpr, 0, 0); g.clearRect(0, 0, W, H);
+    const ink = cssVar("--muted"), grid = cssVar("--grid"), text = cssVar("--ink");
+    g.font = `11px ${cssVar("--f-mono")}`;
+    if (s.type === "bar") return this.drawBars(g, W, H, ink, grid, text);
+    // y range with 10% margin (as axis tight + ylim margin in MATLAB)
+    let lo = Infinity, hi = -Infinity;
+    for (const se of s.series) for (const v of se.y) if (isFinite(v)) { lo = Math.min(lo, v); hi = Math.max(hi, v); }
+    for (const h of s.hlines || []) { lo = Math.min(lo, h.y); hi = Math.max(hi, h.y); }
+    if (s.yMin0) lo = Math.min(lo, 0);
+    let m = (hi - lo) * 0.1; if (!(m > 0)) m = 1;
+    lo -= m; hi += m;
+    const yt = niceTicks(lo, hi, Math.max(3, Math.floor(H / 36)));
+    const dec = yt.step < 1 ? (yt.step < 0.1 ? 2 : 1) : 0;
+    const labW = Math.max(...yt.ticks.map(t => g.measureText(t.toFixed(dec)).width));
+    const L = this.box = { l: labW + 12, r: W - 8, t: 8, b: H - 22 };
+    const X = v => L.l + (v - s.xMin) / (s.xMax - s.xMin) * (L.r - L.l);
+    const Y = v => L.b - (v - lo) / (hi - lo) * (L.b - L.t);
+    // grid + labels
+    g.strokeStyle = grid; g.lineWidth = 1; g.fillStyle = ink; g.textAlign = "right"; g.textBaseline = "middle";
+    for (const t of yt.ticks) {
+      const y = Math.round(Y(t)) + .5; if (y < L.t - 1 || y > L.b + 1) continue;
+      g.beginPath(); g.moveTo(L.l, y); g.lineTo(L.r, y); g.stroke();
+      g.fillText(t.toFixed(dec), L.l - 6, y);
+    }
+    g.textAlign = "center"; g.textBaseline = "top";
+    for (const t of s.xTicks) {
+      const x = Math.round(X(t)) + .5;
+      g.beginPath(); g.moveTo(x, L.t); g.lineTo(x, L.b); g.stroke();
+      g.fillText(s.xFmt(t), Math.min(Math.max(x, L.l + 14), L.r - 14), L.b + 6);
+    }
+    g.save(); g.beginPath(); g.rect(L.l, L.t - 2, L.r - L.l, L.b - L.t + 4); g.clip();
+    for (const h of s.hlines || []) {
+      g.strokeStyle = h.color; g.lineWidth = 1.5; g.setLineDash([6, 4]);
+      g.beginPath(); g.moveTo(L.l, Y(h.y)); g.lineTo(L.r, Y(h.y)); g.stroke();
+    }
+    g.setLineDash([]);
+    for (const se of s.series) {
+      const pts = se.y.map((v, i) => [X(s.x[i]), Y(v)]);
+      if (se.fill) {
+        g.beginPath(); g.moveTo(pts[0][0], Y(Math.max(lo, 0)));
+        pts.forEach(p => g.lineTo(p[0], p[1])); g.lineTo(pts[pts.length - 1][0], Y(Math.max(lo, 0))); g.closePath();
+        g.fillStyle = se.fill; g.fill();
+      }
+      g.strokeStyle = withAlpha(se.color, se.alpha ?? 1); g.lineWidth = se.width || 1.5;
+      g.setLineDash(se.dash || []); g.lineJoin = "round";
+      g.beginPath(); pts.forEach((p, i) => i ? g.lineTo(p[0], p[1]) : g.moveTo(p[0], p[1])); g.stroke();
+      g.setLineDash([]);
+    }
+    g.restore();
+    // hover crosshair + tooltip
+    if (this.hover >= 0 && this.hover < s.x.length) {
+      const i = this.hover, x = X(s.x[i]);
+      g.strokeStyle = ink; g.lineWidth = 1; g.setLineDash([2, 3]);
+      g.beginPath(); g.moveTo(x + .5, L.t); g.lineTo(x + .5, L.b); g.stroke(); g.setLineDash([]);
+      const rows = [];
+      for (const se of s.series) {
+        if (se.noTip) continue;
+        const v = se.y[i]; if (!isFinite(v)) continue;
+        g.fillStyle = se.color; g.beginPath(); g.arc(x, Y(v), 3, 0, Math.PI * 2); g.fill();
+        rows.push([se.name, (s.tipFmt || (z => z.toFixed(1)))(v), se.color]);
+      }
+      const head = s.tipHead ? s.tipHead(i) : s.xFmt(s.x[i]);
+      g.font = `12px ${cssVar("--f-body")}`;
+      const tw = Math.max(g.measureText(head).width, ...rows.map(r => g.measureText(r[0] + "  " + r[1]).width)) + 30;
+      const th = 20 + rows.length * 17;
+      let tx = x + 12; if (tx + tw > L.r) tx = x - 12 - tw;
+      const ty = L.t + 4;
+      g.fillStyle = withAlpha(cssVar("--surface"), .96); g.strokeStyle = cssVar("--line");
+      g.beginPath(); g.roundRect(tx, ty, tw, th, 6); g.fill(); g.stroke();
+      g.fillStyle = text; g.textAlign = "left"; g.textBaseline = "top";
+      g.font = `600 12px ${cssVar("--f-body")}`; g.fillText(head, tx + 10, ty + 5);
+      g.font = `12px ${cssVar("--f-body")}`;
+      rows.forEach((r, k) => {
+        const yy = ty + 22 + k * 17;
+        g.fillStyle = r[2]; g.fillRect(tx + 10, yy + 4, 8, 8);
+        g.fillStyle = ink; g.fillText(r[0], tx + 24, yy);
+        g.fillStyle = text; g.textAlign = "right"; g.fillText(r[1], tx + tw - 10, yy); g.textAlign = "left";
+      });
+    }
+  }
+  drawBars(g, W, H, ink, grid, text) {
+    const s = this.spec, n = s.cats.length;
+    const totals = s.cats.map((_, i) => s.stacks.reduce((a, st) => a + st.values[i], 0));
+    const hi = Math.max(60, ...totals) * 1.18;
+    const yt = niceTicks(0, hi, Math.max(3, Math.floor(H / 40)));
+    const labW = Math.max(...yt.ticks.map(t => g.measureText(String(t)).width));
+    const L = { l: labW + 12, r: W - 8, t: 8, b: H - 24 };
+    const Y = v => L.b - v / hi * (L.b - L.t);
+    g.strokeStyle = grid; g.fillStyle = ink; g.textAlign = "right"; g.textBaseline = "middle";
+    for (const t of yt.ticks) { const y = Math.round(Y(t)) + .5; g.beginPath(); g.moveTo(L.l, y); g.lineTo(L.r, y); g.stroke(); g.fillText(String(t), L.l - 6, y); }
+    const slot = (L.r - L.l) / n, bw = Math.min(56, slot * 0.56);
+    for (let i = 0; i < n; i++) {
+      const cx = L.l + slot * (i + .5);
+      let base = 0;
+      for (const st of s.stacks) {
+        const v = st.values[i]; if (!v) continue;
+        g.fillStyle = st.color;
+        g.fillRect(cx - bw / 2, Y(base + v), bw, Y(base) - Y(base + v));
+        base += v;
+      }
+      const best = i === s.best;
+      g.textAlign = "center"; g.textBaseline = "top";
+      g.font = `${best ? "600 " : ""}12px ${cssVar("--f-body")}`; g.fillStyle = best ? cssVar("--accent") : ink;
+      g.fillText(s.cats[i] + (best ? " ★" : ""), cx, L.b + 6);
+      g.font = `600 12px ${cssVar("--f-mono")}`; g.fillStyle = text; g.textBaseline = "bottom";
+      g.fillText(totals[i] > 0 ? `${totals[i]} min` : "0", cx, Y(totals[i]) - 3);
+    }
+    g.strokeStyle = ink; g.beginPath(); g.moveTo(L.l, L.b + .5); g.lineTo(L.r, L.b + .5); g.stroke();
+  }
+}
+
+/* ================= Location data ================= */
+// THAI_GEO: [[provinceTH, provinceEN, [[districtTH, lat, lon], ...]], ...] (first district = อำเภอเมือง)
+const PROVS = THAI_GEO.slice().sort((a, b) => a[0].localeCompare(b[0], "th"));
+const isBkk = p => p[1] === "Bangkok";
+const distLabel = (p, d) => (isBkk(p) ? "เขต" : "อ.") + d[0];
+const provLabel = p => isBkk(p) ? p[0] : "จ." + p[0];
+const SAMPLES = [
+  ["บางเลน", "นครปฐม", "บางเลน"], ["เชียงใหม่", "เชียงใหม่", "เมืองเชียงใหม่"], ["ขอนแก่น", "ขอนแก่น", "เมืองขอนแก่น"],
+  ["นครราชสีมา", "นครราชสีมา", "เมืองนครราชสีมา"], ["ปทุมวัน", "กรุงเทพมหานคร", "ปทุมวัน"], ["ศรีราชา", "ชลบุรี", "ศรีราชา"],
+  ["หาดใหญ่", "สงขลา", "หาดใหญ่"], ["ภูเก็ต", "ภูเก็ต", "เมืองภูเก็ต"], ["แม่ฮ่องสอน", "แม่ฮ่องสอน", "เมืองแม่ฮ่องสอน"], ["อุบลราชธานี", "อุบลราชธานี", "เมืองอุบลราชธานี"]
+];
+const provSel = $("prov"), distSel = $("dist"), latIn = $("lat"), lonIn = $("lon");
+PROVS.forEach((p, i) => provSel.add(new Option(p[0], i)));
+const qIndex = [];
+PROVS.forEach((p, pi) => p[2].forEach((d, di) => qIndex.push({ key: `${distLabel(p, d)} ${provLabel(p)}`, pi, di })));
+$("qlist").innerHTML = qIndex.map(q => `<option value="${q.key}"></option>`).join("");
+
+function fillDistricts(pi) {
+  distSel.innerHTML = "";
+  PROVS[pi][2].forEach((d, i) => distSel.add(new Option(d[0], i)));
+}
+function haversine(a, b, c, d) {
+  const R = 6371, r = Math.PI / 180, dl = (c - a) * r, dn = (d - b) * r;
+  const h = Math.sin(dl / 2) ** 2 + Math.cos(a * r) * Math.cos(c * r) * Math.sin(dn / 2) ** 2;
+  return 2 * R * Math.asin(Math.sqrt(h));
+}
+function nearest(lat, lon) {
+  let best = null, bd = Infinity;
+  PROVS.forEach((p, pi) => p[2].forEach((d, di) => { const k = haversine(lat, lon, d[1], d[2]); if (k < bd) { bd = k; best = { pi, di, km: k }; } }));
+  return best;
+}
+const loc = { name: "", custom: false };
+function selectDistrict(pi, di, opts = {}) {
+  provSel.value = pi; fillDistricts(pi); distSel.value = di;
+  const p = PROVS[pi], d = p[2][di];
+  if (!opts.keepCoords) { latIn.value = d[1].toFixed(4); lonIn.value = d[2].toFixed(4); }
+  loc.name = `${distLabel(p, d)} ${provLabel(p)}`;
+  loc.custom = !!opts.keepCoords;
+  document.querySelectorAll("#samples .chip").forEach(c => c.setAttribute("aria-pressed", String(c.dataset.pi == pi && c.dataset.di == di && !opts.keepCoords)));
+  updateSite(opts.km);
+}
+function updateSite(km) {
+  const lat = +latIn.value, lon = +lonIn.value;
+  $("siteName").textContent = loc.custom ? `พิกัดกำหนดเอง · ใกล้${loc.name}` : loc.name;
+  $("siteCoord").textContent = `${Math.abs(lat).toFixed(4)}°${lat >= 0 ? "N" : "S"}  ${Math.abs(lon).toFixed(4)}°${lon >= 0 ? "E" : "W"}`;
+  if (loc.custom && km != null) {
+    $("locHint").className = "hint" + (km > 60 ? " err" : "");
+    $("locHint").textContent = km > 60
+      ? `พิกัดอยู่นอกประเทศไทย (ห่างจาก${loc.name} ${km.toFixed(0)} กม.) ระบบยังคำนวณมุมดวงอาทิตย์ด้วยเวลาไทย UTC+7`
+      : `ห่างจากศูนย์กลาง${loc.name} ${km.toFixed(1)} กม.`;
+  } else if (!loc.custom) {
+    $("locHint").className = "hint"; $("locHint").textContent = "ใช้พิกัดจุดศูนย์กลางพื้นที่ของอำเภอ แก้ไขพิกัดเองได้";
+  }
+  updateSun(); markStale();
+}
+function updateSun() {
+  const lat = +latIn.value, lon = +lonIn.value, [y, m, d] = $("d0").value.split("-").map(Number);
+  if (!isFinite(lat) || !isFinite(lon) || !y) return;
+  const s = solarGeom(lat, lon, y, m, d, 12);
+  const ok = isFinite(s.rise) && s.set > s.rise;
+  $("sRise").textContent = ok ? fmtHM(s.rise) : "—";
+  $("sNoon").textContent = fmtHM(s.noon);
+  $("sSet").textContent = ok ? fmtHM(s.set) : "—";
+}
+SAMPLES.forEach(([label, pn, dn]) => {
+  const pi = PROVS.findIndex(p => p[0] === pn), di = pi >= 0 ? PROVS[pi][2].findIndex(d => d[0] === dn) : -1;
+  if (pi < 0 || di < 0) return;
+  const b = document.createElement("button");
+  b.type = "button"; b.className = "chip"; b.textContent = label; b.dataset.pi = pi; b.dataset.di = di;
+  b.addEventListener("click", () => selectDistrict(pi, di));
+  $("samples").append(b);
+});
+provSel.addEventListener("change", () => selectDistrict(+provSel.value, 0));
+distSel.addEventListener("change", () => selectDistrict(+provSel.value, +distSel.value));
+$("q").addEventListener("change", e => {
+  const v = e.target.value.trim(); if (!v) return;
+  const hit = qIndex.find(q => q.key === v) || qIndex.find(q => q.key.includes(v));
+  if (hit) { selectDistrict(hit.pi, hit.di); e.target.value = ""; }
+  else { $("locHint").className = "hint err"; $("locHint").textContent = `ไม่พบ "${v}" ลองพิมพ์ชื่ออำเภอโดยไม่ต้องใส่คำว่า อ.`; }
+});
+function onCoordEdit() {
+  const lat = +latIn.value, lon = +lonIn.value;
+  if (!isFinite(lat) || !isFinite(lon) || latIn.value === "" || lonIn.value === "" || Math.abs(lat) > 90 || Math.abs(lon) > 180) {
+    $("locHint").className = "hint err"; $("locHint").textContent = "ละติจูดต้องอยู่ระหว่าง -90 ถึง 90 และลองจิจูดระหว่าง -180 ถึง 180"; return;
+  }
+  const nb = nearest(lat, lon);
+  selectDistrict(nb.pi, nb.di, { keepCoords: true, km: nb.km });
+}
+latIn.addEventListener("change", onCoordEdit);
+lonIn.addEventListener("change", onCoordEdit);
+$("gpsBtn").addEventListener("click", () => {
+  const hint = $("locHint"), btn = $("gpsBtn");
+  if (!("geolocation" in navigator)) { hint.className = "hint err"; hint.textContent = "เบราว์เซอร์นี้ไม่รองรับการระบุตำแหน่ง"; return; }
+  btn.disabled = true; hint.className = "hint"; hint.textContent = "กำลังขอตำแหน่งจาก GPS…";
+  navigator.geolocation.getCurrentPosition(pos => {
+    btn.disabled = false;
+    latIn.value = pos.coords.latitude.toFixed(5); lonIn.value = pos.coords.longitude.toFixed(5);
+    const nb = nearest(pos.coords.latitude, pos.coords.longitude);
+    selectDistrict(nb.pi, nb.di, { keepCoords: true, km: nb.km });
+    $("siteName").textContent = `ตำแหน่งปัจจุบัน · ใกล้${loc.name}`;
+    if (nb.km <= 60) hint.textContent = `ได้พิกัดจาก GPS (ความคลาดเคลื่อน ±${Math.round(pos.coords.accuracy)} ม.) ใกล้${loc.name} ${nb.km.toFixed(1)} กม.`;
+  }, err => {
+    btn.disabled = false; hint.className = "hint err";
+    hint.textContent = err.code === 1 ? "ไม่ได้รับอนุญาตให้เข้าถึงตำแหน่ง กรุณาอนุญาตในการตั้งค่าเบราว์เซอร์ (ต้องเปิดผ่าน https หรือไฟล์ในเครื่อง)"
+      : err.code === 3 ? "หมดเวลารอสัญญาณ GPS ลองอีกครั้งในที่โล่ง" : "ระบุตำแหน่งไม่สำเร็จ ลองอีกครั้งหรือเลือกจากรายการ";
+  }, { enableHighAccuracy: true, timeout: 15000, maximumAge: 60000 });
+});
+
+/* ================= Settings ================= */
+function readNum(id, def, lo, hi) {
+  let v = parseFloat($(id).value);
+  if (!isFinite(v)) v = def;
+  v = Math.min(hi, Math.max(lo, v));
+  $(id).value = v;
+  return v;
+}
+function band() {
+  const target = readNum("target", 400, 380, 416), tol = readNum("tol", 5, 2, 10);
+  $("tolR").value = tol;
+  const vmin = target * (1 - tol / 100), vmax = target * (1 + tol / 100);
+  $("bandTxt").textContent = `${vmin.toFixed(1)} – ${vmax.toFixed(1)} V`;
+  return { target, tol, vmin, vmax };
+}
+$("tolR").addEventListener("input", () => { $("tol").value = $("tolR").value; band(); if (state.model) renderDay(); });
+$("tol").addEventListener("change", () => { band(); if (state.model) renderDay(); });
+$("target").addEventListener("change", () => { band(); markStale(); });
+["trafo", "pv", "hid", "ep", "lr"].forEach(id => $(id).addEventListener("change", markStale));
+$("d0").addEventListener("change", () => { updateSun(); markStale(); });
+$("d1").addEventListener("change", markStale);
+$("cloud").addEventListener("input", () => { $("cloudTxt").textContent = $("cloud").value + "%"; markStale(); });
+document.querySelectorAll('input[name="src"]').forEach(r => r.addEventListener("change", () => {
+  const meteo = r.value === "meteo" && r.checked;
+  if (!r.checked) return;
+  $("cloudField").hidden = meteo;
+  $("srcHint").textContent = meteo
+    ? "ดึงรังสีอาทิตย์รายชั่วโมง (shortwave radiation) ของพิกัดนี้จาก Open-Meteo แล้วประมาณค่าเป็นทุก 15 นาที ต้องเชื่อมต่ออินเทอร์เน็ต"
+    : "คำนวณมุมดวงอาทิตย์จากพิกัด (NOAA) และรังสีท้องฟ้าใส (Haurwitz) แล้วลดทอนด้วยเมฆสุ่ม";
+  markStale();
+}));
+
+const state = { model: null, busy: false };
+function setStatus(cls, text) { const s = $("status"); s.className = "pill " + cls; s.textContent = text; }
+function markStale() { if (state.model && !state.busy) setStatus("stale", "ค่าตั้งเปลี่ยน กดจำลองใหม่"); }
+const logLines = [];
+function log(s = "") { logLines.push(s); $("log").textContent = logLines.join("\n"); $("log").scrollTop = 1e9; }
+
+/* ================= Open-Meteo irradiance ================= */
+async function fetchGHI(lat, lon, d0, d1, n) {
+  const q = `latitude=${lat.toFixed(4)}&longitude=${lon.toFixed(4)}&start_date=${d0}&end_date=${d1}&hourly=shortwave_radiation&timezone=Asia%2FBangkok`;
+  const urls = [`https://archive-api.open-meteo.com/v1/archive?${q}`, `https://api.open-meteo.com/v1/forecast?${q}`];
+  let lastErr;
+  for (const u of urls) {
+    try {
+      const r = await fetch(u);
+      if (!r.ok) throw new Error("HTTP " + r.status);
+      const j = await r.json();
+      const vals = j.hourly && j.hourly.shortwave_radiation;
+      if (!vals || vals.filter(v => v != null).length < vals.length * 0.9) throw new Error("ข้อมูลไม่ครบ");
+      // hourly value = mean of the preceding hour -> centre it at hh-0.5, then interpolate to 15-min mid-slots
+      const out = new Float64Array(n);
+      for (let k = 0; k < n; k++) {
+        const t = k * 0.25 + 0.125 + 0.5; // hours since start, shifted to hourly-centre index space
+        const i = Math.floor(t), f = t - i;
+        const a = vals[Math.min(i, vals.length - 1)] ?? 0, b = vals[Math.min(i + 1, vals.length - 1)] ?? a;
+        out[k] = a + (b - a) * f;
+      }
+      return out;
+    } catch (e) { lastErr = e; }
+  }
+  throw lastErr;
+}
+
+/* ================= Run: simulate + train ================= */
+function parseDate(v) { const [y, m, d] = v.split("-").map(Number); return { y, m, d }; }
+async function run(e) {
+  if (e) e.preventDefault();
+  if (state.busy) return;
+  const lat = parseFloat(latIn.value), lon = parseFloat(lonIn.value);
+  if (!isFinite(lat) || !isFinite(lon)) { setStatus("err", "พิกัดไม่ถูกต้อง"); return; }
+  const trafo = readNum("trafo", 500, 50, 5000), pv = readNum("pv", 250, 0, 5000);
+  const { target, tol } = band();
+  const hidden = Math.round(readNum("hid", 32, 4, 100)), epochs = Math.round(readNum("ep", 40, 5, 150)), lr = readNum("lr", 0.01, 0.0005, 0.05);
+  const s0 = parseDate($("d0").value), s1 = parseDate($("d1").value);
+  const days = Math.round((Date.UTC(s1.y, s1.m - 1, s1.d) - Date.UTC(s0.y, s0.m - 1, s0.d)) / 86400000) + 1;
+  if (!(days >= 7 && days <= 120)) { setStatus("err", "ช่วงวันที่ต้องยาว 7–120 วัน"); $("runHint").textContent = "เลือกวันสิ้นสุดให้ห่างจากวันเริ่มต้น 7 ถึง 120 วัน"; $("runHint").className = "hint err"; return; }
+  $("runHint").className = "hint";
+  state.busy = true; $("runBtn").disabled = true; $("prog").style.width = "0";
+  logLines.length = 0;
+  log("--------------------------------------------------------");
+  log(`     SYSTEM CONFIGURATION: ${loc.name}`);
+  log("--------------------------------------------------------");
+  log(`Location           : ${lat.toFixed(4)}, ${lon.toFixed(4)}`);
+  log(`Transformer Rating : ${trafo} kVA`);
+  log(`PV Inverter        : ${pv} kW`);
+  log(`Target Voltage     : ${target} V  (±${tol}%)`);
+  log(`Period             : ${$("d0").value} → ${$("d1").value} (${days} days, 15-min)`);
+
+  let ghi = null;
+  const useMeteo = document.querySelector('input[name="src"]:checked').value === "meteo";
+  if (useMeteo) {
+    setStatus("busy", "กำลังดึงข้อมูลแดด…");
+    try { ghi = await fetchGHI(lat, lon, $("d0").value, $("d1").value, days * 96); log("Irradiance         : Open-Meteo (measured/reanalysis)"); }
+    catch (err) { log(`[!] Open-Meteo unavailable (${err.message}) -> using clear-sky model`); }
+  }
+  if (!ghi) log(`Irradiance         : NOAA clear-sky model, cloud ${$("cloud").value}%`);
+
+  const rows = buildDataset({ lat, lon, trafo, pv, target, start: s0, days, cloud: +$("cloud").value / 100, ghi });
+  const P = prepare(rows);
+  log(`Samples            : ${rows.length}  (train ${P.train.length} / test ${P.test.length})`);
+  log("");
+  log("[i] Training LSTM Network... (Please wait)");
+  setStatus("busy", "กำลังฝึก LSTM…");
+  const t0 = performance.now();
+  let lastYield = performance.now();
+  const { net, history } = await trainLSTM(P, { hidden, epochs, lr }, async (ep, rmse) => {
+    $("prog").style.width = (ep / epochs * 100).toFixed(1) + "%";
+    $("runBtn").textContent = `กำลังฝึก… epoch ${ep}/${epochs}`;
+    if (performance.now() - lastYield > 30) { await new Promise(r => setTimeout(r, 0)); lastYield = performance.now(); }
+  });
+  log(`[i] Training Completed. (${((performance.now() - t0) / 1000).toFixed(1)} s, ${epochs} epochs, ${hidden} hidden units)`);
+
+  const predTr = predictVolts(net, P.Xtr, P), predTe = predictVolts(net, P.Xte, P);
+  const metric = (set, pr) => {
+    let s = 0, a = 0; set.forEach((r, i) => { const e = r.voltage - pr[i]; s += e * e; a += Math.abs(e); });
+    return { rmse: Math.sqrt(s / set.length), mae: a / set.length };
+  };
+  const mTr = metric(P.train, predTr), mTe = metric(P.test, predTe);
+  log("");
+  log("--------------------------------------------------------");
+  log("     LSTM MODEL PERFORMANCE (LOSS METRICS)");
+  log("--------------------------------------------------------");
+  log(`Training Data -> RMSE: ${mTr.rmse.toFixed(2).padStart(5)} V | MAE: ${mTr.mae.toFixed(2).padStart(5)} V`);
+  log(`Testing Data  -> RMSE: ${mTe.rmse.toFixed(2).padStart(5)} V | MAE: ${mTe.mae.toFixed(2).padStart(5)} V`);
+  log("--------------------------------------------------------");
+
+  const all = P.train.concat(P.test), pred = predTr.concat(predTe);
+  const dayList = [];
+  for (let i = 0; i + 96 <= all.length; i += 96) dayList.push({ start: i, set: i < P.split ? "train" : "test", r: all[i] });
+  state.model = { all, pred, dayList, split: P.split, history, mTr, mTe, trafo, pv };
+  $("kTest").textContent = mTe.rmse.toFixed(2) + " V";
+  $("kTestSub").innerHTML = `RMSE · MAE <span class="num">${mTe.mae.toFixed(2)} V</span> · ${P.test.length / 96} วัน`;
+  $("kTrain").textContent = mTr.rmse.toFixed(2) + " V";
+  $("kTrainSub").innerHTML = `RMSE · MAE <span class="num">${mTr.mae.toFixed(2)} V</span> · ${Math.round(P.train.length / 96)} วัน`;
+  c6.set({
+    x: history.map((_, i) => i + 1), xMin: 1, xMax: Math.max(2, history.length),
+    xTicks: niceTicks(1, history.length, 6).ticks.filter(t => t >= 1), xFmt: t => String(t),
+    series: [{ y: history, color: cssVar("--accent"), width: 2, name: "RMSE" }],
+    tipHead: i => `Epoch ${i + 1}`, tipFmt: v => v.toFixed(3) + " V"
+  });
+  const setSel = document.querySelector('input[name="set"]:checked').value;
+  state.dayIdx = dayList.findIndex(d => d.set === setSel);
+  fillDaySelect();
+  renderDay();
+  state.busy = false; $("runBtn").disabled = false; $("runBtn").textContent = "จำลองและฝึก LSTM";
+  setStatus("ok", ghi ? "เสร็จ · ข้อมูลแดดจริง" : "เสร็จ · แบบจำลอง");
+}
+$("cfg").addEventListener("submit", run);
+
+/* ================= Tap analysis (MATLAB section 4) ================= */
+function analyze(pred, vmin, vmax) {
+  const res = TAP_STEPS.map((st, i) => {
+    const adj = pred.map(v => v * (1 + st));
+    const over = adj.filter(v => v > vmax).length * SAMPLE_MIN, under = adj.filter(v => v < vmin).length * SAMPLE_MIN;
+    return { i, st, adj, over, under, total: over + under, lo: Math.min(...adj), hi: Math.max(...adj) };
+  });
+  let best = 0;
+  res.forEach((r, i) => { if (r.total < res[best].total) best = i; });
+  return { res, best };
+}
+function fillDaySelect() {
+  const m = state.model, sel = $("daySel");
+  sel.innerHTML = "";
+  m.dayList.forEach((d, i) => sel.add(new Option(`${fmtDay(d.r)} · ${d.set === "train" ? "Historical" : "Forecast"}`, i)));
+  sel.value = state.dayIdx;
+}
+$("daySel").addEventListener("change", e => { state.dayIdx = +e.target.value; syncSet(); renderDay(); });
+document.querySelectorAll('input[name="set"]').forEach(r => r.addEventListener("change", () => {
+  if (!state.model || !r.checked) return;
+  state.dayIdx = state.model.dayList.findIndex(d => d.set === r.value);
+  $("daySel").value = state.dayIdx; renderDay();
+}));
+function syncSet() {
+  const d = state.model.dayList[state.dayIdx];
+  document.querySelector(`input[name="set"][value="${d.set}"]`).checked = true;
+}
+
+function renderSchedule(vmin, vmax) {
+  const m = state.model, wrap = $("schedule");
+  wrap.innerHTML = "";
+  let bestCounts = [0, 0, 0, 0, 0];
+  m.dayList.forEach((d, i) => {
+    const { res, best } = analyze(m.pred.slice(d.start, d.start + 96), vmin, vmax);
+    if (d.set === "test") bestCounts[best]++;
+    const b = document.createElement("button");
+    b.type = "button"; b.className = "sday" + (d.set === "train" ? " train" : "") + (res[best].total ? " viol" : "");
+    b.setAttribute("aria-pressed", String(i === state.dayIdx));
+    b.title = `${fmtDay(d.r)} · ${d.set === "train" ? "ชุดฝึกสอน" : "ชุดพยากรณ์"} · ${TAP_LABELS[best]} · หลุดเกณฑ์ ${res[best].total} นาที`;
+    b.innerHTML = `<small>${fmtDay(d.r).split(" ").slice(0, 2).join(" ")}</small><b>T${best + 1}</b><em>${res[best].total ? res[best].total + "m" : "0m"}</em>`;
+    b.addEventListener("click", () => { state.dayIdx = i; $("daySel").value = i; syncSet(); renderDay(); });
+    wrap.append(b);
+  });
+  const top = bestCounts.indexOf(Math.max(...bestCounts));
+  $("schedSub").textContent = `กรอบเส้นประ = ชุดฝึกสอน · ช่วงพยากรณ์ใช้ ${TAP_LABELS[top]} บ่อยที่สุด (${bestCounts[top]}/${bestCounts.reduce((a, b) => a + b, 0)} วัน)`;
+  const cur = wrap.children[state.dayIdx];
+  if (cur) wrap.scrollLeft = cur.offsetLeft - wrap.clientWidth / 2 + cur.clientWidth / 2;
+}
+
+function renderDay() {
+  const m = state.model; if (!m) return;
+  const { target, tol, vmin, vmax } = band();
+  const d = m.dayList[state.dayIdx], rows = m.all.slice(d.start, d.start + 96), pred = m.pred.slice(d.start, d.start + 96);
+  const { res, best } = analyze(pred, vmin, vmax);
+  const x = rows.map(r => r.hour), xTicks = [0, 4, 8, 12, 16, 20, 23.75];
+  const base = { x, xMin: 0, xMax: 23.75, xTicks, xFmt: fmtHM, tipHead: i => `${fmtDay(rows[i])} ${fmtHM(x[i])}` };
+  const suffix = d.set === "train" ? "Historical Validation" : "Future Forecast";
+  const sunAt = rows.map(r => r.sunlight * 1000), peak = Math.max(...sunAt);
+  $("t1sub").textContent = `${fmtDay(d.r)} · ${suffix} · สูงสุด ${peak.toFixed(0)} W/m² · PV สูงสุด ${(peak / 1000 * m.pv).toFixed(0)} kW`;
+  c1.set({ ...base, yMin0: true, tipFmt: v => v.toFixed(0) + " W/m²",
+    series: [{ y: sunAt, color: cssVar("--sun"), fill: cssVar("--sun-soft"), width: 1.5, name: "แสงแดด" }] });
+  c2.set({ ...base, tipFmt: v => v.toFixed(1) + " V",
+    series: [{ y: rows.map(r => r.v22), color: cssVar("--hv"), width: 1.8, name: "22 kV" }] });
+  const tapColors = [1, 2, 3, 4, 5].map(i => cssVar("--tap" + i));
+  const lim = [{ y: vmin, color: cssVar("--over") }, { y: vmax, color: cssVar("--over") }];
+  c3.set({ ...base, hlines: lim, tipFmt: v => v.toFixed(1) + " V",
+    series: res.map((r, i) => ({ y: r.adj, color: tapColors[i], width: i === best ? 2.6 : 1.2, alpha: i === best ? 1 : 0.55, name: TAP_LABELS[i] + (i === best ? " ★" : "") }))
+      .sort((a, b) => (a.width > b.width) - (b.width > a.width)) });
+  $("lg3").innerHTML = TAP_LABELS.map((l, i) => `<span style="${i === best ? "color:var(--ink);font-weight:600" : ""}"><i style="background:${tapColors[i]};${i === best ? "height:4px" : "opacity:.6"}"></i>${l} (${TAP_STEPS[i] > 0 ? "+" : ""}${(TAP_STEPS[i] * 100).toFixed(1)}%)</span>`).join("");
+  c4.set({ ...base, hlines: lim, tipFmt: v => v.toFixed(1) + " V",
+    series: [
+      { y: rows.map(r => r.voltage), color: cssVar("--actual"), width: 1.3, name: "ค่าจริง" },
+      { y: pred, color: cssVar("--predict"), width: 1.3, dash: [5, 4], name: "LSTM" },
+      { y: res[best].adj, color: cssVar("--opt"), width: 2.4, name: "หลังปรับ " + TAP_LABELS[best] }
+    ] });
+  c5.set({ type: "bar", cats: TAP_LABELS, best,
+    stacks: [{ values: res.map(r => r.under), color: cssVar("--under") }, { values: res.map(r => r.over), color: cssVar("--over") }] });
+  $("t5sub").textContent = `เกณฑ์ ${target} V ±${tol}%`;
+  $("tapTbl").innerHTML = res.map((r, i) => `<tr class="${i === best ? "best" : ""}"><td><span class="sw" style="background:${tapColors[i]}"></span>${TAP_LABELS[i]}${i === best ? " ★" : ""}</td><td>${r.st > 0 ? "+" : ""}${(r.st * 100).toFixed(1)}%</td><td>${r.under}</td><td>${r.over}</td><td>${r.total}</td><td>${r.lo.toFixed(1)}</td><td>${r.hi.toFixed(1)}</td></tr>`).join("");
+  $("kTap").textContent = `${TAP_LABELS[best]} (${TAP_STEPS[best] > 0 ? "+" : ""}${(TAP_STEPS[best] * 100).toFixed(1)}%)`;
+  $("kTapSub").textContent = `${fmtDay(d.r)} · ${suffix}`;
+  $("kViol").textContent = `${res[best].total} / ${res[2].total} นาที`;
+  const saved = res[2].total - res[best].total;
+  $("kViolSub").innerHTML = saved > 0 ? `ลดลง <span class="num">${saved}</span> นาทีเทียบกับแท็ปกลาง` : (res[best].total === 0 ? "อยู่ในเกณฑ์ตลอดทั้งวัน" : "แท็ปกลางดีที่สุดแล้ว");
+  renderSchedule(vmin, vmax);
+}
+
+/* ================= Boot ================= */
+const c1 = new Chart($("c1"), "day"), c2 = new Chart($("c2"), "day"), c3 = new Chart($("c3"), "day"), c4 = new Chart($("c4"), "day");
+const c5 = new Chart($("c5"), null), c6 = new Chart($("c6"), null);
+const redrawAll = () => { if (!state.model) return; renderDay(); if (c6.spec) { c6.spec.series[0].color = cssVar("--accent"); c6.draw(); } };
+matchMedia("(prefers-color-scheme: dark)").addEventListener("change", redrawAll);
+new MutationObserver(redrawAll).observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
+(function boot() {
+  const pi = PROVS.findIndex(p => p[0] === "นครปฐม"), di = PROVS[pi][2].findIndex(d => d[0] === "บางเลน");
+  selectDistrict(pi, di);
+  band();
+  $("cloudTxt").textContent = $("cloud").value + "%";
+  run();
+})();
+</script>
+</body>
+</html>
