@@ -62,6 +62,7 @@
   --shadow: 0 1px 2px rgba(0, 0, 0, .3), 0 4px 16px rgba(0, 0, 0, .25);
 }
 * { box-sizing: border-box; }
+[hidden] { display: none !important; }
 html, body { margin: 0; }
 body {
   background: var(--bg); color: var(--ink);
@@ -138,6 +139,7 @@ input[type="range"] { width: 100%; accent-color: var(--accent); }
 }
 .btn:hover { border-color: var(--accent); }
 .btn:disabled { opacity: .55; cursor: progress; }
+.btn.pdf { background: var(--surface); }
 .btn.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); font-family: var(--f-display); font-weight: 600; font-size: 15px; padding: 11px 14px; }
 .btn.primary:hover { filter: brightness(1.08); }
 .gps { width: 100%; }
@@ -151,6 +153,9 @@ input[type="range"] { width: 100%; accent-color: var(--accent); }
 .dot input:checked { border-color: var(--accent); }
 .dot input:checked::after { transform: scale(1); }
 .dot:has(input:checked) { border-color: var(--accent); background: var(--accent-soft); }
+.dots.three { grid-template-columns: repeat(3, 1fr); }
+.dots.three .dot { flex-direction: column; text-align: center; gap: 6px; padding: 8px 4px; }
+.dots.three .dot b { white-space: nowrap; }
 .dot b { display: block; font-weight: 600; font-size: 13.5px; line-height: 1.3; }
 .dot small { display: block; color: var(--muted); font-size: 11.5px; line-height: 1.3; }
 .seg { display: grid; grid-template-columns: 1fr 1fr; border: 1px solid var(--line); border-radius: 7px; overflow: hidden; }
@@ -269,6 +274,10 @@ footer { max-width: 1440px; margin: 24px auto 0; color: var(--muted); font-size:
       <div class="site-coord num" id="siteCoord">—</div>
     </div>
     <span class="pill" id="status">พร้อม</span>
+    <button type="button" class="btn pdf" id="pdfBtn" disabled>
+      <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M4 1.5h5.5L13 5v9.5H4z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><path d="M9 1.5V5.5h4M8.5 8v4.5M6.5 10.5l2 2 2-2" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      ออกรายงาน PDF
+    </button>
   </div>
 </header>
 
@@ -305,6 +314,20 @@ footer { max-width: 1440px; margin: 24px auto 0; color: var(--muted); font-size:
       <section class="sect">
         <h2><b>02</b>ระบบไฟฟ้า</h2>
         <div class="field">
+          <span>อ้างอิงมาตรฐานการไฟฟ้า</span>
+          <div class="dots three" role="radiogroup" aria-label="อ้างอิงมาตรฐานการไฟฟ้า">
+            <label class="dot"><input type="radio" name="util" value="pea" checked><span><b>กฟภ.</b><small>PEA</small></span></label>
+            <label class="dot"><input type="radio" name="util" value="mea"><span><b>กฟน.</b><small>MEA</small></span></label>
+            <label class="dot"><input type="radio" name="util" value="custom"><span><b>กำหนดเอง</b><small>Custom</small></span></label>
+          </div>
+        </div>
+        <div class="row2">
+          <label class="field" id="hvNomF"><span>แรงดันระบุแรงสูง</span><select id="hvNom"></select></label>
+          <label class="field" id="hvCustF" hidden><span>แรงดันแรงสูง (kV)</span><input type="number" id="hvCust" value="22" min="0.4" max="69" step="0.1"></label>
+          <label class="field"><span>แรงดันระบุแรงต่ำ</span><select id="lvNom" disabled><option>230/400 V</option></select></label>
+        </div>
+        <p class="hint" id="utilHint"></p>
+        <div class="field">
           <span>ชนิดหม้อแปลง</span>
           <div class="dots" role="radiogroup" aria-label="ชนิดหม้อแปลง">
             <label class="dot"><input type="radio" name="phase" id="ph1" value="1"><span><b>1 เฟส</b><small>230 V · 1P2W</small></span></label>
@@ -318,13 +341,13 @@ footer { max-width: 1440px; margin: 24px auto 0; color: var(--muted); font-size:
       </section>
 
       <section class="sect">
-        <h2><b>03</b>มาตรฐานแรงดัน</h2>
+        <h2><b>03</b>มาตรฐานแรงดันตู้ MDB</h2>
         <div class="row2">
-          <label class="field"><span id="targetLbl">แรงดันเป้าหมาย (380–416 V)</span><input type="number" id="target" value="400" min="380" max="416" step="1"></label>
+          <label class="field"><span id="targetLbl">แรงดันเป้าหมายที่ MDB (380–416 V)</span><input type="number" id="target" value="400" min="380" max="416" step="1"></label>
           <label class="field"><span>พิกัดเผื่อ ± (2–10 %)</span><input type="number" id="tol" value="5" min="2" max="10" step="0.5"></label>
         </div>
         <input type="range" id="tolR" min="2" max="10" step="0.5" value="5" aria-label="พิกัดเผื่อแรงดัน">
-        <div class="band"><span>ช่วงที่ยอมรับ</span><b id="bandTxt">380.0 – 420.0 V</b></div>
+        <div class="band"><span>ช่วงที่ยอมรับที่ตู้ MDB</span><b id="bandTxt">380.0 – 420.0 V</b></div>
         <p class="hint" id="stdHint">3 เฟส: แรงดันระหว่างสาย 380–416 V · ปรับพิกัดเผื่อได้ทันทีโดยไม่ต้องฝึก LSTM ใหม่</p>
       </section>
 
@@ -355,14 +378,14 @@ footer { max-width: 1440px; margin: 24px auto 0; color: var(--muted); font-size:
       </section>
 
       <section class="sect">
-        <h2><b>05</b>แรงดันไฟฟ้าแรงสูง <span style="text-transform:none">(22 kV)</span></h2>
+        <h2><b>05</b>แรงดันไฟฟ้าแรงสูง <span style="text-transform:none">(<span class="hvkv">22 kV</span>)</span></h2>
         <div class="seg" role="radiogroup" aria-label="แหล่งข้อมูลแรงดันแรงสูง">
           <label><input type="radio" name="hvsrc" value="sim" checked><span>จำลองโดยระบบ</span></label>
           <label><input type="radio" name="hvsrc" value="csv"><span>นำเข้าไฟล์ .CSV</span></label>
         </div>
         <p class="hint" id="hvHint">แรงดัน 22 kV ขึ้นตามความเข้มแสงอาทิตย์ของพื้นที่ที่เลือก (PV จำนวนมากบนสายป้อนจ่ายไฟย้อน) และตกตามโหลด แล้วส่งผ่านหม้อแปลงไปยังด้านแรงต่ำ</p>
         <label class="field" id="hvSunField">
-          <span>แรงดัน 22 kV เพิ่มขึ้นเมื่อแดด 1,000 W/m² <b class="num" id="hvSunTxt">+1.5% (+330 V)</b></span>
+          <span>แรงดัน <span class="hvkv">22 kV</span> เพิ่มขึ้นเมื่อแดด 1,000 W/m² <b class="num" id="hvSunTxt">+1.5% (+330 V)</b></span>
           <input type="range" id="hvSun" min="0" max="3" step="0.1" value="1.5">
         </label>
         <div class="file" id="hvBox" hidden>
@@ -370,7 +393,7 @@ footer { max-width: 1440px; margin: 24px auto 0; color: var(--muted); font-size:
           <div class="file-stat" id="hvStat">ยังไม่ได้เลือกไฟล์ · ลากไฟล์มาวางที่กรอบนี้ได้</div>
           <div class="cv" style="height:70px" id="hvPrevWrap" hidden><canvas id="hvPrev"></canvas></div>
           <button type="button" class="btn" id="hvTpl">ดาวน์โหลดไฟล์ตัวอย่าง (96 จุด)</button>
-          <p class="hint">รูปแบบ: <span class="mono">time,v22</span> ตั้งแต่ 00:00 ถึง 24:00 ทุก 15 นาที (96 หรือ 97 แถว) ค่าเป็น V หรือ kV ก็ได้ ถ้ามีหลายวัน (96×n แถว) จะใช้เรียงตามวันและวนซ้ำจนครบช่วงข้อมูล</p>
+          <p class="hint">รูปแบบ: <span class="mono">time,hv</span> ตั้งแต่ 00:00 ถึง 24:00 ทุก 15 นาที (96 หรือ 97 แถว) ค่าเป็น V หรือ kV ก็ได้ ถ้ามีหลายวัน (96×n แถว) จะใช้เรียงตามวันและวนซ้ำจนครบช่วงข้อมูล</p>
         </div>
       </section>
 
@@ -409,8 +432,8 @@ footer { max-width: 1440px; margin: 24px auto 0; color: var(--muted); font-size:
     </section>
 
     <section class="panel">
-      <div class="panel-head"><h3><i>2</i>แรงดันด้านแรงสูง (สาย 22 kV)</h3><span class="sub" id="t2sub"></span>
-        <div class="legend"><span><i style="background:var(--hv)"></i>v22 (V)</span></div></div>
+      <div class="panel-head"><h3><i>2</i>แรงดันด้านแรงสูง (สาย <span class="hvkv">22 kV</span>)</h3><span class="sub" id="t2sub"></span>
+        <div class="legend"><span><i style="background:var(--hv)"></i>แรงดันแรงสูง (V)</span></div></div>
       <div class="cv" style="height:130px"><canvas id="c2"></canvas></div>
     </section>
 
@@ -421,7 +444,7 @@ footer { max-width: 1440px; margin: 24px auto 0; color: var(--muted); font-size:
     </section>
 
     <section class="panel">
-      <div class="panel-head"><h3><i>4</i>ผลวิเคราะห์ LSTM: แรงดันหลังปรับแท็ป</h3>
+      <div class="panel-head"><h3><i>4</i>ผลวิเคราะห์ LSTM: แรงดันที่ตู้ MDB หลังปรับแท็ป</h3>
         <div class="legend">
           <span><i style="background:var(--actual)"></i>ค่าจริง</span>
           <span><i class="dash" style="color:var(--predict)"></i>LSTM ทำนาย</span>
@@ -550,9 +573,10 @@ function buildDataset(o) {
     r.sunlight = sun[k];
     r.solar_kw = sun[k] * P;
     r.load_kw = T * 0.3 + T * 0.1 * Math.sin(2 * Math.PI * (hr - 14) / 24) + loadNoise[k] * (o.noiseKw ?? 5);
-    const v22sim = 22100 + r.solar_kw * 0.1 * (P / T) - r.load_kw * 0.05;
+    const hvN = o.hvNom ?? 22000;
+    const v22sim = (22100 + r.solar_kw * 0.1 * (P / T) - r.load_kw * 0.05) * hvN / 22000;
     // simulated HV rises with the area's irradiance (regional PV back-feed): hvSun = fraction of 22 kV per 1000 W/m2
-    r.v22 = o.hv ? o.hv[k] : v22sim + 22000 * (o.hvSun ?? 0) * sun[k];
+    r.v22 = o.hv ? o.hv[k] : v22sim + hvN * (o.hvSun ?? 0) * sun[k];
     r.voltage = V + ((r.solar_kw / T * 60) - ((r.load_kw - T * 0.3) / T * 25) + vNoise[k] * 1.5) * (o.vScale ?? 1);
     // imported HV: its deviation from the simulated line passes to the LV side through the turns ratio
     r.voltage += V * (r.v22 / v22sim - 1);
@@ -797,13 +821,14 @@ class Chart {
   }
   draw() {
     const s = this.spec; if (!s) return;
-    const dpr = window.devicePixelRatio || 1, W = this.cv.parentElement.clientWidth, H = this.cv.parentElement.clientHeight;
+    const C = n => (this.pal && this.pal[n]) || cssVar(n);
+    const dpr = this.scale || window.devicePixelRatio || 1, W = this.w || this.cv.parentElement.clientWidth, H = this.h || this.cv.parentElement.clientHeight;
     if (!W || !H) return;
     this.cv.width = Math.round(W * dpr); this.cv.height = Math.round(H * dpr);
     const g = this.ctx; g.setTransform(dpr, 0, 0, dpr, 0, 0); g.clearRect(0, 0, W, H);
-    const ink = cssVar("--muted"), grid = cssVar("--grid"), text = cssVar("--ink");
-    g.font = `11px ${cssVar("--f-mono")}`;
-    if (s.type === "bar") return this.drawBars(g, W, H, ink, grid, text);
+    const ink = C("--muted"), grid = C("--grid"), text = C("--ink");
+    g.font = `11px ${C("--f-mono")}`;
+    if (s.type === "bar") return this.drawBars(g, W, H, ink, grid, text, C);
     // y range with 10% margin (as axis tight + ylim margin in MATLAB)
     let lo = Infinity, hi = -Infinity;
     for (const se of s.series) for (const v of se.y) if (isFinite(v)) { lo = Math.min(lo, v); hi = Math.max(hi, v); }
@@ -862,16 +887,16 @@ class Chart {
         rows.push([se.name, (s.tipFmt || (z => z.toFixed(1)))(v), se.color]);
       }
       const head = s.tipHead ? s.tipHead(i) : s.xFmt(s.x[i]);
-      g.font = `12px ${cssVar("--f-body")}`;
+      g.font = `12px ${C("--f-body")}`;
       const tw = Math.max(g.measureText(head).width, ...rows.map(r => g.measureText(r[0] + "  " + r[1]).width)) + 30;
       const th = 20 + rows.length * 17;
       let tx = x + 12; if (tx + tw > L.r) tx = x - 12 - tw;
       const ty = L.t + 4;
-      g.fillStyle = withAlpha(cssVar("--surface"), .96); g.strokeStyle = cssVar("--line");
+      g.fillStyle = withAlpha(C("--surface"), .96); g.strokeStyle = C("--line");
       g.beginPath(); g.roundRect(tx, ty, tw, th, 6); g.fill(); g.stroke();
       g.fillStyle = text; g.textAlign = "left"; g.textBaseline = "top";
-      g.font = `600 12px ${cssVar("--f-body")}`; g.fillText(head, tx + 10, ty + 5);
-      g.font = `12px ${cssVar("--f-body")}`;
+      g.font = `600 12px ${C("--f-body")}`; g.fillText(head, tx + 10, ty + 5);
+      g.font = `12px ${C("--f-body")}`;
       rows.forEach((r, k) => {
         const yy = ty + 22 + k * 17;
         g.fillStyle = r[2]; g.fillRect(tx + 10, yy + 4, 8, 8);
@@ -880,7 +905,7 @@ class Chart {
       });
     }
   }
-  drawBars(g, W, H, ink, grid, text) {
+  drawBars(g, W, H, ink, grid, text, C) {
     const s = this.spec, n = s.cats.length;
     const totals = s.cats.map((_, i) => s.stacks.reduce((a, st) => a + st.values[i], 0));
     const hi = Math.max(60, ...totals) * 1.18;
@@ -902,13 +927,21 @@ class Chart {
       }
       const best = i === s.best;
       g.textAlign = "center"; g.textBaseline = "top";
-      g.font = `${best ? "600 " : ""}12px ${cssVar("--f-body")}`; g.fillStyle = best ? cssVar("--accent") : ink;
+      g.font = `${best ? "600 " : ""}12px ${C("--f-body")}`; g.fillStyle = best ? C("--accent") : ink;
       g.fillText(s.cats[i] + (best ? " ★" : ""), cx, L.b + 6);
-      g.font = `600 12px ${cssVar("--f-mono")}`; g.fillStyle = text; g.textBaseline = "bottom";
+      g.font = `600 12px ${C("--f-mono")}`; g.fillStyle = text; g.textBaseline = "bottom";
       g.fillText(totals[i] > 0 ? `${totals[i]} min` : "0", cx, Y(totals[i]) - 3);
     }
     g.strokeStyle = ink; g.beginPath(); g.moveTo(L.l, L.b + .5); g.lineTo(L.r, L.b + .5); g.stroke();
   }
+}
+
+// render a chart spec off-screen with a fixed light palette (for the PDF report)
+function chartImage(spec, w, h, pal, scale) {
+  const cv = document.createElement("canvas");
+  const c = Object.assign(Object.create(Chart.prototype), { cv, ctx: cv.getContext("2d"), spec, hover: -1, pal, w, h, scale });
+  c.draw();
+  return cv;
 }
 
 /* ================= Location data ================= */
@@ -1018,18 +1051,58 @@ const PHASE = {
   3: { name: "3 เฟส", lo: 380, hi: 416, def: 400, nominal: 400, trafo: 500, pv: 250, hint: "3 เฟส: แรงดันระหว่างสาย 380–416 V" },
   1: { name: "1 เฟส", lo: 200, hi: 240, def: 230, nominal: 230, trafo: 50, pv: 25, hint: "1 เฟส: แรงดันเฟส-นิวทรัล 200–240 V" }
 };
-const phaseCfg = () => PHASE[document.querySelector('input[name="phase"]:checked').value];
+// มาตรฐานการไฟฟ้า: แรงดันระบุระบบจำหน่ายแรงสูง (kV) ส่วนแรงต่ำเป็น 230/400 V ทั้ง กฟภ. และ กฟน.
+const UTIL = {
+  pea: { name: "การไฟฟ้าส่วนภูมิภาค (กฟภ.)", short: "กฟภ.", hv: [22, 33], hint: "กฟภ.: ระบบจำหน่าย 22 kV และ 33 kV (ส่วนใหญ่ในภาคใต้) · แรงต่ำ 230/400 V" },
+  mea: { name: "การไฟฟ้านครหลวง (กฟน.)", short: "กฟน.", hv: [12, 24], hint: "กฟน.: ระบบจำหน่าย 12 kV และ 24 kV · แรงต่ำ 230/400 V" },
+  custom: { name: "กำหนดเอง", short: "กำหนดเอง", hv: null, hint: "กำหนดแรงดันแรงสูงเอง และขยายช่วงแรงดันเป้าหมายที่ตู้ MDB ได้กว้างขึ้น" }
+};
+const CUSTOM_RANGE = { 1: [100, 260], 3: [180, 480] };
+const utilKey = () => document.querySelector('input[name="util"]:checked').value;
+const hvNomV = () => utilKey() === "custom" ? readNum("hvCust", 22, 0.4, 69) * 1000 : +$("hvNom").value * 1000;
+const hvTxt = () => `${+(hvNomV() / 1000).toFixed(2)} kV`;
+function phaseCfg() {
+  const ph = PHASE[document.querySelector('input[name="phase"]:checked').value];
+  if (utilKey() !== "custom") return ph;
+  const [lo, hi] = CUSTOM_RANGE[ph === PHASE[1] ? 1 : 3];
+  return { ...ph, lo, hi };
+}
+function updateStdLabels() {
+  const ph = phaseCfg();
+  $("targetLbl").textContent = `แรงดันเป้าหมายที่ MDB (${ph.lo}–${ph.hi} V)`;
+  $("target").min = ph.lo; $("target").max = ph.hi;
+  $("stdHint").textContent = (utilKey() === "custom" ? `${ph.name}: กำหนดเอง ${ph.lo}–${ph.hi} V` : ph.hint) + " · วัดที่ตู้ MDB · ปรับพิกัดเผื่อได้ทันทีโดยไม่ต้องฝึก LSTM ใหม่";
+}
+function updateHvLabels() {
+  const t = hvTxt();
+  document.querySelectorAll(".hvkv").forEach(e => { e.textContent = t; });
+  const v = +$("hvSun").value;
+  $("hvSunTxt").textContent = `+${v.toFixed(1)}% (+${Math.round(hvNomV() * v / 100)} V)`;
+  setHvHint();
+}
+function onUtilChange() {
+  const u = UTIL[utilKey()], custom = !u.hv;
+  $("hvNomF").hidden = custom; $("hvCustF").hidden = !custom;
+  if (!custom) {
+    const cur = +$("hvNom").value;
+    $("hvNom").innerHTML = u.hv.map(k => `<option value="${k}">${k} kV</option>`).join("");
+    if (u.hv.includes(cur)) $("hvNom").value = cur;
+  }
+  $("utilHint").textContent = u.hint;
+  updateStdLabels(); band(); updateHvLabels(); markStale();
+}
+document.querySelectorAll('input[name="util"]').forEach(r => r.addEventListener("change", () => { if (r.checked) onUtilChange(); }));
+$("hvNom").addEventListener("change", () => { updateHvLabels(); markStale(); });
+$("hvCust").addEventListener("change", () => { updateHvLabels(); markStale(); });
 document.querySelectorAll('input[name="phase"]').forEach(r => r.addEventListener("change", () => {
   if (!r.checked) return;
   const ph = phaseCfg(), old = PHASE[r.value === "1" ? 3 : 1];
-  $("targetLbl").textContent = `แรงดันเป้าหมาย (${ph.lo}–${ph.hi} V)`;
-  $("target").min = ph.lo; $("target").max = ph.hi;
   const t = parseFloat($("target").value);
-  $("target").value = isFinite(t) && t >= old.lo && t <= old.hi ? Math.round(t / old.nominal * ph.nominal) : ph.def;
+  $("target").value = isFinite(t) ? Math.round(t / old.nominal * ph.nominal) : ph.def;
+  updateStdLabels();
   // เปลี่ยนขนาดหม้อแปลง/PV เป็นค่าตั้งต้นของชนิดใหม่ หากผู้ใช้ยังไม่ได้แก้ไข
   if (+$("trafo").value === old.trafo) $("trafo").value = ph.trafo;
   if (+$("pv").value === old.pv) $("pv").value = ph.pv;
-  $("stdHint").textContent = ph.hint + " · ปรับพิกัดเผื่อได้ทันทีโดยไม่ต้องฝึก LSTM ใหม่";
   band(); markStale();
 }));
 function band() {
@@ -1065,16 +1138,22 @@ document.querySelectorAll('input[name="hvsrc"]').forEach(r => r.addEventListener
   const csv = r.value === "csv";
   $("hvBox").hidden = !csv;
   $("hvSunField").hidden = csv;
-  $("hvHint").textContent = csv
-    ? "ใช้แรงดัน 22 kV จากไฟล์ ความต่างจากค่าจำลองจะส่งผ่านหม้อแปลงไปยังแรงดันด้านแรงต่ำตามอัตราส่วน"
-    : "แรงดัน 22 kV ขึ้นตามความเข้มแสงอาทิตย์ของพื้นที่ที่เลือก (PV จำนวนมากบนสายป้อนจ่ายไฟย้อน) และตกตามโหลด แล้วส่งผ่านหม้อแปลงไปยังด้านแรงต่ำ";
+  setHvHint();
   markStale();
 }));
 $("hvSun").addEventListener("input", () => {
-  const v = +$("hvSun").value;
-  $("hvSunTxt").textContent = `+${v.toFixed(1)}% (+${Math.round(22000 * v / 100)} V)`;
-  markStale();
+  updateHvLabels(); markStale();
 });
+function setHvHint() {
+  const csv = document.querySelector('input[name="hvsrc"]:checked').value === "csv", t = hvTxt();
+  $("hvHint").textContent = csv
+    ? `ใช้แรงดัน ${t} จากไฟล์ ความต่างจากค่าจำลองจะส่งผ่านหม้อแปลงไปยังแรงดันด้านแรงต่ำตามอัตราส่วน`
+    : `แรงดัน ${t} ขึ้นตามความเข้มแสงอาทิตย์ของพื้นที่ที่เลือก (PV จำนวนมากบนสายป้อนจ่ายไฟย้อน) และตกตามโหลด แล้วส่งผ่านหม้อแปลงไปยังด้านแรงต่ำ`;
+}
+function hvRangeErr(d) {
+  const vn = hvNomV();
+  return d.lo < vn * 0.7 || d.hi > vn * 1.3 ? `ค่าในไฟล์อยู่ช่วง ${d.lo.toFixed(0)}–${d.hi.toFixed(0)} V ไม่ใช่ระดับ ${hvTxt()} ที่เลือกในหัวข้อ 02` : "";
+}
 function parseHvCsv(text) {
   const lines = text.replace(/^\uFEFF/, "").split(/\r?\n/).map(l => l.trim()).filter(Boolean);
   const vals = [], times = [];
@@ -1097,10 +1176,10 @@ function parseHvCsv(text) {
       throw new Error(`แถวที่ ${i + 1}: เวลาควรเป็น ${fmtHM((i % 96) / 4)} ตรวจสอบว่าเรียงทุก 15 นาทีโดยไม่ขาดแถว`);
   }
   const sorted = vals.slice().sort((a, b) => a - b), med = sorted[sorted.length >> 1];
-  const k = med < 100 ? 1000 : 1; // kV -> V
+  const k = med < 100 ? 1000 : 1; // kV -> V (distribution HV is always above 100 V)
   const values = vals.map(v => v * k);
   const lo = Math.min(...values), hi = Math.max(...values);
-  if (lo < 15000 || hi > 30000) throw new Error(`ค่าอยู่ช่วง ${lo.toFixed(0)}–${hi.toFixed(0)} V ซึ่งไม่ใช่ระดับ 22 kV`);
+  const err = hvRangeErr({ lo, hi }); if (err) throw new Error(err);
   return { values, days: values.length / 96, lo, hi, mean: values.reduce((a, b) => a + b, 0) / values.length, kv: k === 1000 };
 }
 async function loadHvFile(file) {
@@ -1114,7 +1193,7 @@ async function loadHvFile(file) {
     const x = d.values.map((_, i) => i / 4);
     hvPrev.set({ x, xMin: 0, xMax: Math.max(23.75, x[x.length - 1]), xTicks: d.days > 1 ? [] : [0, 6, 12, 18], xFmt: fmtHM,
       tipHead: i => (d.days > 1 ? `วันที่ ${Math.floor(i / 96) + 1} ` : "") + fmtHM((i % 96) / 4), tipFmt: v => v.toFixed(0) + " V",
-      series: [{ y: d.values, color: cssVar("--hv"), width: 1.4, name: "22 kV" }] });
+      series: [{ y: d.values, color: cssVar("--hv"), width: 1.4, name: hvTxt() }] });
     markStale();
   } catch (err) {
     hvData = null; $("hvPrevWrap").hidden = true;
@@ -1128,14 +1207,14 @@ hvBox.addEventListener("dragleave", () => hvBox.classList.remove("drag"));
 hvBox.addEventListener("drop", e => { e.preventDefault(); hvBox.classList.remove("drag"); const f = e.dataTransfer.files[0]; if (f) loadHvFile(f); });
 $("hvTpl").addEventListener("click", () => {
   // ตัวอย่าง: โปรไฟล์ 22 kV หนึ่งวัน แรงดันตกช่วงหัวค่ำ (โหลดสูงสุด) และยกขึ้นช่วงเที่ยง
-  const rows = ["time,v22"];
+  const rows = ["time,hv"], vn = hvNomV();
   for (let i = 0; i <= 96; i++) {
     const h = i / 4;
-    const v = 22100 + 180 * Math.exp(-((h - 12.5) ** 2) / 8) - 260 * Math.exp(-((h - 19.5) ** 2) / 3) + 40 * Math.sin(h / 24 * 2 * Math.PI);
+    const v = (22100 + 180 * Math.exp(-((h - 12.5) ** 2) / 8) - 260 * Math.exp(-((h - 19.5) ** 2) / 3) + 40 * Math.sin(h / 24 * 2 * Math.PI)) * vn / 22000;
     rows.push(`${i === 96 ? "24:00" : fmtHM(h)},${v.toFixed(1)}`);
   }
   const url = URL.createObjectURL(new Blob([rows.join("\n") + "\n"], { type: "text/csv" }));
-  const a = Object.assign(document.createElement("a"), { href: url, download: "hv_22kV_profile.csv" });
+  const a = Object.assign(document.createElement("a"), { href: url, download: `hv_${hvTxt().replace(" ", "")}_profile.csv` });
   document.body.append(a); a.click(); a.remove();
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 });
@@ -1193,9 +1272,10 @@ async function run(e) {
   log(`     SYSTEM CONFIGURATION: ${loc.name}`);
   log("--------------------------------------------------------");
   log(`Location           : ${lat.toFixed(4)}, ${lon.toFixed(4)}`);
+  log(`Utility standard   : ${UTIL[utilKey()].short === "กำหนดเอง" ? "Custom" : utilKey().toUpperCase()} · HV ${hvTxt()} · LV 230/400 V`);
   log(`Transformer Rating : ${trafo} kVA (${ph === PHASE[1] ? "1-phase" : "3-phase"})`);
   log(`PV Inverter        : ${pv} kW`);
-  log(`Target Voltage     : ${target} V  (±${tol}%)`);
+  log(`MDB Target Voltage : ${target} V  (±${tol}%)`);
   log(`Period             : ${$("d0").value} → ${$("d1").value} (${days} days, 15-min)`);
 
   let ghi = null;
@@ -1215,11 +1295,16 @@ async function run(e) {
       setStatus("err", "ยังไม่ได้เลือกไฟล์ CSV แรงดันแรงสูง");
       state.busy = false; $("runBtn").disabled = false; return;
     }
+    const rerr = hvRangeErr(hvData);
+    if (rerr) {
+      log("[!] " + rerr); setStatus("err", "แรงดันในไฟล์ CSV ไม่ตรงกับแรงดันระบุ");
+      state.busy = false; $("runBtn").disabled = false; return;
+    }
     hv = new Float64Array(days * 96);
     for (let k = 0; k < hv.length; k++) hv[k] = hvData.values[k % hvData.values.length];
-    log(`HV 22 kV           : CSV "${hvData.name}" (${hvData.days} day profile${hvData.days > 1 ? "s" : ""}, cycled)`);
-  } else log(`HV 22 kV           : simulated, +${(+$("hvSun").value).toFixed(1)}% per 1000 W/m2 of local irradiance`);
-  const rows = buildDataset({ lat, lon, trafo, pv, target, hv, hvSun: hv ? 0 : +$("hvSun").value / 100, vScale: ph.nominal / 400, noiseKw: ph === PHASE[1] ? 5 * trafo / 500 : 5, start: s0, days, cloud: +$("cloud").value / 100, ghi });
+    log(`HV ${hvTxt().padEnd(15)}: CSV "${hvData.name}" (${hvData.days} day profile${hvData.days > 1 ? "s" : ""}, cycled)`);
+  } else log(`HV ${hvTxt().padEnd(15)}: simulated, +${(+$("hvSun").value).toFixed(1)}% per 1000 W/m2 of local irradiance`);
+  const rows = buildDataset({ lat, lon, trafo, pv, target, hv, hvNom: hvNomV(), hvSun: hv ? 0 : +$("hvSun").value / 100, vScale: ph.nominal / 400, noiseKw: ph === PHASE[1] ? 5 * trafo / 500 : 5, start: s0, days, cloud: +$("cloud").value / 100, ghi });
   const P = prepare(rows);
   log(`Samples            : ${rows.length}  (train ${P.train.length} / test ${P.test.length})`);
   log("");
@@ -1251,7 +1336,10 @@ async function run(e) {
   const all = P.train.concat(P.test), pred = predTr.concat(predTe);
   const dayList = [];
   for (let i = 0; i + 96 <= all.length; i += 96) dayList.push({ start: i, set: i < P.split ? "train" : "test", r: all[i] });
-  state.model = { all, pred, dayList, split: P.split, history, mTr, mTe, trafo, pv, hvName: hv ? hvData.name : "", hvSun: +$("hvSun").value };
+  state.model = { all, pred, dayList, split: P.split, history, mTr, mTe, trafo, pv, hvName: hv ? hvData.name : "", hvSun: +$("hvSun").value, hvTxt: hvTxt(),
+    util: utilKey(), phase: phaseCfg().nominal === 230 ? 1 : 3, lat, lon, site: $("siteName").textContent,
+    period: `${$("d0").value} ถึง ${$("d1").value}`, sunSrc: ghi ? "Open-Meteo (ข้อมูลจริง)" : `แบบจำลองท้องฟ้า เมฆ ${$("cloud").value}%` };
+  $("pdfBtn").disabled = false;
   $("kTest").textContent = mTe.rmse.toFixed(2) + " V";
   $("kTestSub").innerHTML = `RMSE · MAE <span class="num">${mTe.mae.toFixed(2)} V</span> · ${P.test.length / 96} วัน`;
   $("kTrain").textContent = mTr.rmse.toFixed(2) + " V";
@@ -1333,7 +1421,7 @@ function renderDay() {
   c1.set({ ...base, yMin0: true, tipFmt: v => v.toFixed(0) + " W/m²",
     series: [{ y: sunAt, color: cssVar("--sun"), fill: cssVar("--sun-soft"), width: 1.5, name: "แสงแดด" }] });
   c2.set({ ...base, tipFmt: v => v.toFixed(1) + " V",
-    series: [{ y: rows.map(r => r.v22), color: cssVar("--hv"), width: 1.8, name: "22 kV" }] });
+    series: [{ y: rows.map(r => r.v22), color: cssVar("--hv"), width: 1.8, name: m.hvTxt }] });
   $("t2sub").textContent = m.hvName ? `นำเข้าจาก ${m.hvName}` : `จำลองจากแดดในพื้นที่ · +${m.hvSun.toFixed(1)}% ต่อ 1,000 W/m² · สูงสุด ${Math.max(...rows.map(r => r.v22)).toFixed(0)} V เวลา ${fmtHM(rows[rows.map(r => r.v22).indexOf(Math.max(...rows.map(r => r.v22)))].hour)}`;
   const tapColors = [1, 2, 3, 4, 5].map(i => cssVar("--tap" + i));
   const lim = [{ y: vmin, color: cssVar("--over") }, { y: vmax, color: cssVar("--over") }];
@@ -1359,6 +1447,312 @@ function renderDay() {
   renderSchedule(vmin, vmax);
 }
 
+/* ================= PDF report (drawn on canvas, no external library) ================= */
+const RP = { "--muted": "#4F5E58", "--grid": "#E1E8E5", "--ink": "#14201C", "--surface": "#FFFFFF", "--line": "#CBD5D1", "--accent": "#0B7A62" };
+const RC = { ink: "#14201C", muted: "#4F5E58", line: "#CBD5D1", soft: "#F2F6F4", accent: "#0B7A62", accentSoft: "#E1F2EC", over: "#C8392B", under: "#2468C0", warn: "#9A5B00", warnSoft: "#FFF4E0", tap3: "#8A9691", opt: "#D95319", hv: "#2C5DA8", sun: "#C98A0B" };
+const PW = 595.28, PH = 841.89, PS = 2.5, PM = 40;
+const segmenter = typeof Intl !== "undefined" && Intl.Segmenter ? new Intl.Segmenter("th", { granularity: "word" }) : null;
+
+// contiguous violation windows, e.g. "10:00–15:15"
+function windows(adj, test) {
+  const out = [];
+  let st = -1;
+  for (let i = 0; i <= adj.length; i++) {
+    const on = i < adj.length && test(adj[i]);
+    if (on && st < 0) st = i;
+    if (!on && st >= 0) { out.push(`${fmtHM(st / 4)}–${fmtHM(i / 4)}`); st = -1; }
+  }
+  return out;
+}
+const tapName = i => `${TAP_LABELS[i]} (${TAP_STEPS[i] > 0 ? "+" : ""}${(TAP_STEPS[i] * 100).toFixed(1)}%)`;
+
+class ReportDoc {
+  constructor() { this.pages = []; this.font = cssVar("--f-body") || "Tahoma, sans-serif"; this.mono = cssVar("--f-mono") || "monospace"; this.newPage(); }
+  newPage() {
+    const cv = document.createElement("canvas");
+    cv.width = Math.round(PW * PS); cv.height = Math.round(PH * PS);
+    const g = cv.getContext("2d");
+    g.setTransform(PS, 0, 0, PS, 0, 0);
+    g.fillStyle = "#FFFFFF"; g.fillRect(0, 0, PW, PH);
+    this.pages.push(cv); this.g = g; this.y = PM + 26;
+  }
+  ensure(h) { if (this.y + h > PH - PM - 18) { this.newPage(); return true; } return false; }
+  setFont(size, weight = 400, mono = false) { this.g.font = `${weight} ${size}px ${mono ? this.mono : this.font}`; }
+  lines(str, maxW) {
+    const g = this.g, parts = segmenter ? Array.from(segmenter.segment(str), x => x.segment) : str.split(/(\s+)/);
+    const out = []; let cur = "";
+    for (const w of parts) {
+      if (cur && g.measureText(cur + w).width > maxW) { out.push(cur.trimEnd()); cur = w.trimStart(); }
+      else cur += w;
+    }
+    if (cur) out.push(cur);
+    return out;
+  }
+  // wrapped paragraph at the cursor
+  para(str, { size = 10.5, weight = 400, color = RC.ink, x = PM, w = PW - 2 * PM, lh = 1.5, gap = 4 } = {}) {
+    this.setFont(size, weight);
+    for (const ln of this.lines(str, w)) {
+      this.ensure(size * lh);
+      this.g.fillStyle = color; this.g.textBaseline = "top"; this.g.textAlign = "left";
+      this.g.fillText(ln, x, this.y);
+      this.y += size * lh;
+    }
+    this.y += gap;
+  }
+  heading(str, num) {
+    this.ensure(90); // keep the heading with the start of its section
+    this.y += 6;
+    const g = this.g;
+    if (num) {
+      g.fillStyle = RC.accent; g.beginPath(); g.roundRect(PM, this.y, 20, 20, 4); g.fill();
+      this.setFont(11, 700, true); g.fillStyle = "#FFFFFF"; g.textAlign = "center"; g.textBaseline = "middle";
+      g.fillText(String(num), PM + 10, this.y + 10.5);
+    }
+    this.setFont(14, 700); g.fillStyle = RC.ink; g.textAlign = "left"; g.textBaseline = "middle";
+    g.fillText(str, PM + (num ? 28 : 0), this.y + 10);
+    this.y += 30;
+  }
+  // cols: [{label, w (fraction), align}] rows: [[cells]], hl: row index to highlight
+  table(cols, rows, { hl = -1, size = 9.5, rowH = 19, head = true, keep = false } = {}) {
+    const W = PW - 2 * PM, xs = [], G = () => this.g;
+    let acc = PM; for (const c of cols) { xs.push(acc); acc += c.w * W; }
+    const drawHead = () => {
+      G().fillStyle = RC.soft; G().fillRect(PM, this.y, W, rowH);
+      this.setFont(size - 0.5, 600); G().fillStyle = RC.muted; G().textBaseline = "middle";
+      cols.forEach((c, i) => {
+        G().textAlign = c.align || "left";
+        G().fillText(c.label, c.align === "right" ? xs[i] + c.w * W - 6 : c.align === "center" ? xs[i] + c.w * W / 2 : xs[i] + 6, this.y + rowH / 2);
+      });
+      this.y += rowH;
+    };
+    if (keep) this.ensure(rowH * (rows.length + 1) + 8);
+    if (head) { this.ensure(rowH * 2); drawHead(); }
+    rows.forEach((r, ri) => {
+      if (this.ensure(rowH) && head) drawHead();
+      if (ri === hl) { G().fillStyle = RC.accentSoft; G().fillRect(PM, this.y, W, rowH); }
+      G().strokeStyle = RC.line; G().lineWidth = 0.6; G().beginPath(); G().moveTo(PM, this.y + rowH); G().lineTo(PM + W, this.y + rowH); G().stroke();
+      cols.forEach((c, i) => {
+        this.setFont(size, ri === hl && i === 0 ? 700 : 400, !!c.mono);
+        G().fillStyle = ri === hl && i === 0 ? RC.accent : (typeof r[i] === "object" && r[i] && r[i].color) || RC.ink;
+        const t = typeof r[i] === "object" && r[i] ? r[i].t : String(r[i]);
+        G().textAlign = c.align || "left"; G().textBaseline = "middle";
+        G().fillText(t, c.align === "right" ? xs[i] + c.w * W - 6 : c.align === "center" ? xs[i] + c.w * W / 2 : xs[i] + 6, this.y + rowH / 2);
+      });
+      this.y += rowH;
+    });
+    this.y += 8;
+  }
+  image(cv, h, legend) {
+    const W = PW - 2 * PM;
+    this.ensure(h + (legend ? 18 : 0) + 6);
+    if (legend) {
+      let x = PM; this.setFont(9);
+      for (const [label, color, dash] of legend) {
+        const g = this.g; g.strokeStyle = color; g.lineWidth = 2.2; g.setLineDash(dash ? [4, 3] : []);
+        g.beginPath(); g.moveTo(x, this.y + 6); g.lineTo(x + 16, this.y + 6); g.stroke(); g.setLineDash([]);
+        g.fillStyle = RC.muted; g.textAlign = "left"; g.textBaseline = "middle"; g.fillText(label, x + 21, this.y + 6.5);
+        x += 30 + g.measureText(label).width;
+      }
+      this.y += 16;
+    }
+    this.g.drawImage(cv, PM, this.y, W, h);
+    this.y += h + 8;
+  }
+  // header + footer on every page, once the page count is known
+  finish(title, sub) {
+    const n = this.pages.length;
+    this.pages.forEach((cv, i) => {
+      const g = cv.getContext("2d"); g.setTransform(PS, 0, 0, PS, 0, 0);
+      g.fillStyle = RC.accent; g.fillRect(0, 0, PW, 4);
+      g.font = `600 8.5px ${this.font}`; g.fillStyle = RC.muted; g.textBaseline = "middle";
+      g.textAlign = "left"; g.fillText(title, PM, PM - 6);
+      g.textAlign = "right"; g.fillText(sub, PW - PM, PM - 6);
+      g.strokeStyle = RC.line; g.lineWidth = 0.6; g.beginPath(); g.moveTo(PM, PM + 4); g.lineTo(PW - PM, PM + 4); g.stroke();
+      g.beginPath(); g.moveTo(PM, PH - PM + 4); g.lineTo(PW - PM, PH - PM + 4); g.stroke();
+      g.font = `8.5px ${this.font}`; g.textAlign = "left";
+      g.fillText("ผลจากแบบจำลองพยากรณ์ ใช้ประกอบการตัดสินใจ ต้องยืนยันด้วยการวัดแรงดันจริงที่ตู้ MDB ทุกครั้ง", PM, PH - PM + 16);
+      g.textAlign = "right"; g.fillText(`หน้า ${i + 1} / ${n}`, PW - PM, PH - PM + 16);
+    });
+  }
+}
+
+// minimal PDF: one full-page JPEG per page
+function buildPdf(pages) {
+  const enc = new TextEncoder(), parts = [], offs = [];
+  let len = 0;
+  const push = x => { const b = typeof x === "string" ? enc.encode(x) : x; parts.push(b); len += b.length; };
+  const obj = (num, fn) => { offs[num] = len; push(`${num} 0 obj\n`); fn(); push("\nendobj\n"); };
+  push("%PDF-1.4\n%âãÏÓ\n");
+  const n = pages.length, total = 2 + n * 3;
+  obj(1, () => push("<< /Type /Catalog /Pages 2 0 R >>"));
+  obj(2, () => push(`<< /Type /Pages /Kids [${pages.map((_, i) => `${3 + i * 3} 0 R`).join(" ")}] /Count ${n} >>`));
+  pages.forEach((cv, i) => {
+    const pg = 3 + i * 3, ct = pg + 1, im = pg + 2;
+    const b64 = cv.toDataURL("image/jpeg", 0.9).split(",")[1], bin = atob(b64), bytes = new Uint8Array(bin.length);
+    for (let k = 0; k < bin.length; k++) bytes[k] = bin.charCodeAt(k);
+    obj(pg, () => push(`<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${PW} ${PH}] /Resources << /XObject << /Im0 ${im} 0 R >> >> /Contents ${ct} 0 R >>`));
+    const cs = `q ${PW} 0 0 ${PH} 0 0 cm /Im0 Do Q`;
+    obj(ct, () => push(`<< /Length ${cs.length} >>\nstream\n${cs}\nendstream`));
+    obj(im, () => { push(`<< /Type /XObject /Subtype /Image /Width ${cv.width} /Height ${cv.height} /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length ${bytes.length} >>\nstream\n`); push(bytes); push("\nendstream"); });
+  });
+  const xref = len;
+  push(`xref\n0 ${total + 1}\n0000000000 65535 f \n`);
+  for (let i = 1; i <= total; i++) push(String(offs[i]).padStart(10, "0") + " 00000 n \n");
+  push(`trailer\n<< /Size ${total + 1} /Root 1 0 R >>\nstartxref\n${xref}\n%%EOF\n`);
+  return new Blob(parts, { type: "application/pdf" });
+}
+
+async function makeReport() {
+  const m = state.model; if (!m) return;
+  try { await document.fonts.ready; } catch (e) { /* fonts optional */ }
+  const { target, tol, vmin, vmax } = band();
+  const d = m.dayList[state.dayIdx], rows = m.all.slice(d.start, d.start + 96), pred = m.pred.slice(d.start, d.start + 96);
+  const { res, best } = analyze(pred, vmin, vmax);
+  const now = new Date(), stamp = `${now.getDate()} ${TH_MONTH[now.getMonth()]} ${now.getFullYear() + 543} ${pad2(now.getHours())}:${pad2(now.getMinutes())} น.`;
+  const doc = new ReportDoc(), g = () => doc.g;
+  const vLabel = m.phase === 3 ? "แรงดันระหว่างสาย" : "แรงดันเฟส-นิวทรัล";
+
+  // ----- title -----
+  doc.setFont(20, 700); g().fillStyle = RC.ink; g().textBaseline = "top"; g().textAlign = "left";
+  g().fillText("รายงานแนะนำการปรับแท็ปหม้อแปลง", PM, doc.y); doc.y += 30;
+  doc.para(`${m.site} · วันที่วิเคราะห์ ${fmtDay(d.r)} (${d.set === "train" ? "ข้อมูลย้อนหลัง" : "วันพยากรณ์"}) · ออกรายงาน ${stamp}`, { size: 10, color: RC.muted, gap: 10 });
+
+  // ----- recommendation box -----
+  const tap3 = res[2], rb = res[best];
+  const overW = windows(tap3.adj, v => v > vmax), underW = windows(tap3.adj, v => v < vmin);
+  const bestOver = windows(rb.adj, v => v > vmax), bestUnder = windows(rb.adj, v => v < vmin);
+  const pts = [];
+  if (tap3.total === 0) pts.push(`ที่แท็ปกลาง (Tap 3) แรงดันที่ตู้ MDB อยู่ในช่วง ${vmin.toFixed(1)}–${vmax.toFixed(1)} V ตลอดวัน`);
+  else {
+    if (tap3.over) pts.push(`ถ้าคงไว้ที่ Tap 3: แรงดันเกิน ${vmax.toFixed(1)} V รวม ${tap3.over} นาที ช่วง ${overW.join(", ")} น. (สูงสุด ${tap3.hi.toFixed(1)} V)`);
+    if (tap3.under) pts.push(`ถ้าคงไว้ที่ Tap 3: แรงดันต่ำกว่า ${vmin.toFixed(1)} V รวม ${tap3.under} นาที ช่วง ${underW.join(", ")} น. (ต่ำสุด ${tap3.lo.toFixed(1)} V)`);
+  }
+  if (best !== 2) pts.push(rb.total === 0
+    ? `หลังปรับเป็น ${TAP_LABELS[best]}: แรงดันอยู่ระหว่าง ${rb.lo.toFixed(1)}–${rb.hi.toFixed(1)} V อยู่ในเกณฑ์ตลอดวัน`
+    : `หลังปรับเป็น ${TAP_LABELS[best]}: ยังหลุดเกณฑ์ ${rb.total} นาที${bestOver.length ? ` (เกินช่วง ${bestOver.join(", ")} น.)` : ""}${bestUnder.length ? ` (ต่ำช่วง ${bestUnder.join(", ")} น.)` : ""} ควรพิจารณาวิธีอื่นร่วมด้วย เช่น ควบคุมกำลังรีแอคทีฟของอินเวอร์เตอร์`);
+  else pts.push("ไม่ต้องปรับแท็ป คงไว้ที่ Tap 3");
+  doc.setFont(10.5);
+  const ptLines = pts.map(t => doc.lines("• " + t, PW - 2 * PM - 28));
+  const boxH = 64 + ptLines.reduce((a, l) => a + l.length, 0) * 16;
+  const ok = rb.total === 0;
+  g().fillStyle = ok ? RC.accentSoft : RC.warnSoft; g().strokeStyle = ok ? RC.accent : RC.warn; g().lineWidth = 1.2;
+  g().beginPath(); g().roundRect(PM, doc.y, PW - 2 * PM, boxH, 8); g().fill(); g().stroke();
+  doc.setFont(10, 600); g().fillStyle = ok ? RC.accent : RC.warn; g().fillText("คำแนะนำ", PM + 14, doc.y + 12);
+  doc.setFont(22, 700); g().fillStyle = RC.ink;
+  g().fillText(best === 2 ? "คงแท็ปไว้ที่ " + tapName(2) : "ให้ตั้งแท็ปที่ " + tapName(best), PM + 14, doc.y + 28);
+  let yy = doc.y + 60;
+  doc.setFont(10.5); g().fillStyle = RC.ink;
+  for (const ls of ptLines) for (const ln of ls) { g().fillText(ln, PM + 14, yy); yy += 16; }
+  doc.y += boxH + 14;
+
+  // ----- site data -----
+  doc.heading("ข้อมูลสถานีและมาตรฐานที่ใช้", 1);
+  const u = UTIL[m.util];
+  doc.table([{ label: "รายการ", w: 0.34 }, { label: "ค่า", w: 0.66 }], [
+    ["สถานที่ติดตั้ง", m.site],
+    ["พิกัด", `${m.lat.toFixed(4)}°N, ${m.lon.toFixed(4)}°E`],
+    ["มาตรฐานการไฟฟ้า", `${u.name} · แรงสูง ${m.hvTxt} · แรงต่ำ 230/400 V`],
+    ["หม้อแปลง", `${m.trafo} kVA · ${m.phase === 3 ? "3 เฟส 4 สาย (400 V)" : "1 เฟส 2 สาย (230 V)"}`],
+    ["อินเวอร์เตอร์ PV", `${m.pv} kW`],
+    ["มาตรฐานแรงดันที่ตู้ MDB", `${target} V ±${tol}% → ยอมรับ ${vmin.toFixed(1)}–${vmax.toFixed(1)} V (${vLabel})`],
+    ["แรงดันแรงสูง", m.hvName ? `นำเข้าจากไฟล์ ${m.hvName}` : `จำลองจากแดดในพื้นที่ (+${m.hvSun.toFixed(1)}% ต่อ 1,000 W/m²)`],
+    ["ข้อมูลแสงแดด / ช่วงข้อมูล", `${m.sunSrc} · ${m.period}`],
+    ["ความแม่นยำของ LSTM", `คลาดเคลื่อนเฉลี่ย (RMSE) ${m.mTe.rmse.toFixed(2)} V · MAE ${m.mTe.mae.toFixed(2)} V (ชุดทดสอบ)`]
+  ], { size: 9.5, rowH: 18 });
+
+  // ----- MDB voltage chart -----
+  doc.heading(`แรงดันที่ตู้ MDB วันที่ ${fmtDay(d.r)}: ก่อนและหลังปรับแท็ป`, 2);
+  const x = rows.map(r => r.hour), base = { x, xMin: 0, xMax: 23.75, xTicks: [0, 3, 6, 9, 12, 15, 18, 21, 23.75], xFmt: fmtHM };
+  const lim = [{ y: vmin, color: RC.over }, { y: vmax, color: RC.over }];
+  const cw = PW - 2 * PM;
+  const series = [{ y: tap3.adj, color: RC.tap3, width: 1.6, name: "Tap 3" }];
+  if (best !== 2) series.push({ y: rb.adj, color: RC.opt, width: 2.4, name: TAP_LABELS[best] });
+  doc.image(chartImage({ ...base, hlines: lim, series }, cw, 190, RP, PS), 190,
+    [["คงไว้ที่ Tap 3 (ไม่ปรับ)", RC.tap3], ...(best !== 2 ? [[`หลังปรับเป็น ${TAP_LABELS[best]}`, RC.opt]] : []), [`ขอบเขต ${vmin.toFixed(0)} / ${vmax.toFixed(0)} V`, RC.over, true]]);
+
+  // ----- tap table -----
+  doc.heading("เปรียบเทียบทุกตำแหน่งแท็ป (นาทีที่แรงดันหลุดเกณฑ์ในวันนั้น)", 3);
+  doc.table([
+    { label: "แท็ป", w: 0.2 }, { label: "ปรับแรงดัน", w: 0.14, align: "right" }, { label: "ต่ำกว่าเกณฑ์", w: 0.14, align: "right" },
+    { label: "เกินเกณฑ์", w: 0.14, align: "right" }, { label: "รวม (นาที)", w: 0.13, align: "right" }, { label: "ต่ำสุด V", w: 0.125, align: "right" }, { label: "สูงสุด V", w: 0.125, align: "right" }
+  ], res.map((r, i) => [TAP_LABELS[i] + (i === best ? "  ← แนะนำ" : ""), `${r.st > 0 ? "+" : ""}${(r.st * 100).toFixed(1)}%`,
+    { t: String(r.under), color: r.under ? RC.under : RC.ink }, { t: String(r.over), color: r.over ? RC.over : RC.ink }, r.total, r.lo.toFixed(1), r.hi.toFixed(1)]), { hl: best, keep: true });
+
+  // ----- forecast schedule -----
+  doc.heading("แผนแท็ปรายวันช่วงพยากรณ์", 4);
+  const counts = [0, 0, 0, 0, 0];
+  const sched = m.dayList.filter(x => x.set === "test").map(dd => {
+    const a = analyze(m.pred.slice(dd.start, dd.start + 96), vmin, vmax), rb2 = a.res[a.best];
+    counts[a.best]++;
+    return [fmtDay(dd.r), tapName(a.best), { t: String(rb2.total), color: rb2.total ? RC.over : RC.ink }, a.res[2].total, `${rb2.lo.toFixed(1)} – ${rb2.hi.toFixed(1)}`];
+  });
+  const topTap = counts.indexOf(Math.max(...counts));
+  doc.para(`ใน ${sched.length} วันที่พยากรณ์ ตำแหน่งที่เหมาะสมที่สุดบ่อยที่สุดคือ ${tapName(topTap)} (${counts[topTap]} วัน) หม้อแปลงชนิดปรับแท็ปขณะไม่มีไฟปรับบ่อยไม่ได้ ให้เลือกตำแหน่งเดียวที่ใช้ได้กับทุกวันในช่วงนี้`, { size: 10, color: RC.muted });
+  doc.table([{ label: "วันที่", w: 0.18 }, { label: "แท็ปแนะนำ", w: 0.24 }, { label: "หลุดเกณฑ์ (นาที)", w: 0.2, align: "right" }, { label: "ถ้าใช้ Tap 3 (นาที)", w: 0.2, align: "right" }, { label: "ช่วงแรงดัน V", w: 0.18, align: "right" }], sched, { rowH: 17 });
+
+  // ----- sunlight + HV -----
+  doc.heading(`สาเหตุ: แสงแดดและแรงดันแรงสูง ${m.hvTxt} วันที่ ${fmtDay(d.r)}`, 5);
+  doc.image(chartImage({ ...base, yMin0: true, series: [{ y: rows.map(r => r.sunlight * 1000), color: RC.sun, fill: "rgba(201,138,11,.2)", width: 1.5, name: "แดด" }] }, cw, 110, RP, PS), 110, [["ความเข้มแสงอาทิตย์ (W/m²)", RC.sun]]);
+  doc.image(chartImage({ ...base, series: [{ y: rows.map(r => r.v22), color: RC.hv, width: 1.8, name: m.hvTxt }] }, cw, 110, RP, PS), 110, [[`แรงดันแรงสูง ${m.hvTxt} (V)`, RC.hv]]);
+  doc.para("แดดแรงช่วงกลางวันทำให้ PV จ่ายไฟย้อนเข้าระบบ แรงดันจึงสูงขึ้นช่วงเที่ยง ส่วนช่วงหัวค่ำโหลดสูงและไม่มีแดด แรงดันจึงลดลง การปรับแท็ปเลื่อนแรงดันทั้งวันขึ้นหรือลงเท่ากันเป็นเปอร์เซ็นต์", { size: 10, color: RC.muted });
+
+  // ----- work steps -----
+  doc.heading("ขั้นตอนสำหรับพนักงานช่าง", 6);
+  const target3 = best === 2 ? "Tap 3" : TAP_LABELS[best];
+  const steps = [
+    `ตรวจป้ายชื่อหม้อแปลง (nameplate): รายงานนี้ถือว่า Tap 1 ให้แรงดันแรงต่ำ −5%, Tap 2 −2.5%, Tap 3 เท่าแรงดันระบุ, Tap 4 +2.5% และ Tap 5 +5% ถ้าป้ายชื่อเรียงลำดับต่างออกไป ให้เลือกตำแหน่งที่ได้แรงดันแรงต่ำ ${TAP_STEPS[best] > 0 ? "+" : ""}${(TAP_STEPS[best] * 100).toFixed(1)}%`,
+    "วัดและบันทึกแรงดันที่ตู้ MDB ก่อนปรับ ทุกเฟส",
+    "หม้อแปลงจำหน่ายส่วนใหญ่ปรับแท็ปขณะไม่มีไฟ (Off-circuit) ต้องขออนุญาตดับไฟ ปลดวงจรทั้งด้านแรงสูงและแรงต่ำ ตรวจสอบว่าไม่มีไฟ และต่อลงดินตามระเบียบความปลอดภัยก่อนทำงาน",
+    `หมุนสวิตช์แท็ปไปที่ ${target3} ให้ลงล็อก แล้วล็อกกลไกให้แน่น`,
+    `ปลดสายดิน จ่ายไฟคืน แล้ววัดแรงดันที่ตู้ MDB ช่วงเที่ยงวัน (แดดแรง) และช่วงหัวค่ำ (โหลดสูง) ค่าที่ควรได้อยู่ระหว่าง ${vmin.toFixed(1)}–${vmax.toFixed(1)} V`,
+    "บันทึกผลในตารางด้านล่าง หากยังหลุดเกณฑ์ให้แจ้งผู้ควบคุมงานเพื่อพิจารณาแนวทางอื่น"
+  ];
+  steps.forEach((t, i) => {
+    doc.setFont(10.5);
+    const ls = doc.lines(t, PW - 2 * PM - 26);
+    doc.ensure(ls.length * 16 + 6);
+    g().fillStyle = RC.accent; g().beginPath(); g().arc(PM + 8, doc.y + 7.5, 8, 0, Math.PI * 2); g().fill();
+    doc.setFont(9.5, 700, true); g().fillStyle = "#FFFFFF"; g().textAlign = "center"; g().textBaseline = "middle"; g().fillText(String(i + 1), PM + 8, doc.y + 8);
+    doc.setFont(10.5); g().fillStyle = RC.ink; g().textAlign = "left"; g().textBaseline = "top";
+    ls.forEach((ln, k) => g().fillText(ln, PM + 26, doc.y + k * 16));
+    doc.y += ls.length * 16 + 6;
+  });
+
+  // ----- measurement record -----
+  doc.heading("บันทึกผลการวัดแรงดันที่ตู้ MDB (V)", 7);
+  const phCols = m.phase === 3 ? ["L1-L2", "L2-L3", "L3-L1"] : ["L-N"];
+  const cols = [{ label: "ช่วงเวลา", w: 0.28 }, { label: "เวลาที่วัด", w: 0.14 }, ...phCols.map(p => ({ label: p, w: (0.36) / phCols.length, align: "center" })), { label: "ตำแหน่งแท็ป", w: 0.22 }];
+  const blank = new Array(cols.length - 1).fill("");
+  doc.table(cols, [["ก่อนปรับ", ...blank], ["หลังปรับ ช่วงเที่ยง (11:00–13:00)", ...blank], ["หลังปรับ ช่วงหัวค่ำ (18:00–20:00)", ...blank]], { rowH: 26 });
+  doc.ensure(70);
+  doc.y += 26;
+  const sw = (PW - 2 * PM) / 3;
+  ["ผู้ปฏิบัติงาน", "ผู้ควบคุมงาน", "วันที่ปฏิบัติงาน"].forEach((t, i) => {
+    const x0 = PM + i * sw + 10;
+    g().strokeStyle = RC.ink; g().lineWidth = 0.7; g().setLineDash([2, 2]);
+    g().beginPath(); g().moveTo(x0, doc.y); g().lineTo(x0 + sw - 20, doc.y); g().stroke(); g().setLineDash([]);
+    doc.setFont(9.5); g().fillStyle = RC.muted; g().textAlign = "center"; g().textBaseline = "top";
+    g().fillText(t, x0 + (sw - 20) / 2, doc.y + 6);
+  });
+  doc.y += 30;
+
+  doc.finish("AI Tap Forecaster · รายงานแนะนำการปรับแท็ปหม้อแปลง", m.site);
+  const blob = buildPdf(doc.pages);
+  const name = `tap-report_${m.site.replace(/[\\/:*?"<>|·\s]+/g, "_")}_${d.r.y}-${pad2(d.r.m)}-${pad2(d.r.d)}.pdf`;
+  const url = URL.createObjectURL(blob);
+  const a = Object.assign(document.createElement("a"), { href: url, download: name });
+  document.body.append(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 5000);
+  return { name, pages: doc.pages.length, size: blob.size };
+}
+$("pdfBtn").addEventListener("click", async () => {
+  const b = $("pdfBtn"), label = b.innerHTML;
+  b.disabled = true; b.textContent = "กำลังสร้างรายงาน…";
+  try { const r = await makeReport(); if (r) setStatus("ok", `ออกรายงาน ${r.pages} หน้าแล้ว`); }
+  catch (err) { setStatus("err", "สร้างรายงานไม่สำเร็จ: " + err.message); }
+  finally { b.disabled = false; b.innerHTML = label; }
+});
+
 /* ================= Boot ================= */
 const c1 = new Chart($("c1"), "day"), c2 = new Chart($("c2"), "day"), c3 = new Chart($("c3"), "day"), c4 = new Chart($("c4"), "day");
 const c5 = new Chart($("c5"), null), c6 = new Chart($("c6"), null);
@@ -1368,7 +1762,7 @@ new MutationObserver(redrawAll).observe(document.documentElement, { attributes: 
 (function boot() {
   const pi = PROVS.findIndex(p => p[0] === "นครปฐม"), di = PROVS[pi][2].findIndex(d => d[0] === "บางเลน");
   selectDistrict(pi, di);
-  band();
+  onUtilChange();
   $("cloudTxt").textContent = $("cloud").value + "%";
   run();
 })();
