@@ -360,7 +360,11 @@ footer { max-width: 1440px; margin: 24px auto 0; color: var(--muted); font-size:
           <label><input type="radio" name="hvsrc" value="sim" checked><span>จำลองโดยระบบ</span></label>
           <label><input type="radio" name="hvsrc" value="csv"><span>นำเข้าไฟล์ .CSV</span></label>
         </div>
-        <p class="hint" id="hvHint">คำนวณจากโหลดและ PV: 22,100 + 0.1·PV·(PV/kVA) − 0.05·โหลด (V)</p>
+        <p class="hint" id="hvHint">แรงดัน 22 kV ขึ้นตามความเข้มแสงอาทิตย์ของพื้นที่ที่เลือก (PV จำนวนมากบนสายป้อนจ่ายไฟย้อน) และตกตามโหลด แล้วส่งผ่านหม้อแปลงไปยังด้านแรงต่ำ</p>
+        <label class="field" id="hvSunField">
+          <span>แรงดัน 22 kV เพิ่มขึ้นเมื่อแดด 1,000 W/m² <b class="num" id="hvSunTxt">+1.5% (+330 V)</b></span>
+          <input type="range" id="hvSun" min="0" max="3" step="0.1" value="1.5">
+        </label>
         <div class="file" id="hvBox" hidden>
           <input type="file" id="hvFile" accept=".csv,text/csv,text/plain" aria-label="เลือกไฟล์ CSV แรงดันแรงสูง">
           <div class="file-stat" id="hvStat">ยังไม่ได้เลือกไฟล์ · ลากไฟล์มาวางที่กรอบนี้ได้</div>
@@ -547,10 +551,11 @@ function buildDataset(o) {
     r.solar_kw = sun[k] * P;
     r.load_kw = T * 0.3 + T * 0.1 * Math.sin(2 * Math.PI * (hr - 14) / 24) + loadNoise[k] * (o.noiseKw ?? 5);
     const v22sim = 22100 + r.solar_kw * 0.1 * (P / T) - r.load_kw * 0.05;
-    r.v22 = o.hv ? o.hv[k] : v22sim;
+    // simulated HV rises with the area's irradiance (regional PV back-feed): hvSun = fraction of 22 kV per 1000 W/m2
+    r.v22 = o.hv ? o.hv[k] : v22sim + 22000 * (o.hvSun ?? 0) * sun[k];
     r.voltage = V + ((r.solar_kw / T * 60) - ((r.load_kw - T * 0.3) / T * 25) + vNoise[k] * 1.5) * (o.vScale ?? 1);
     // imported HV: its deviation from the simulated line passes to the LV side through the turns ratio
-    if (o.hv) r.voltage += V * (o.hv[k] / v22sim - 1);
+    r.voltage += V * (r.v22 / v22sim - 1);
   }
   for (let k = 0; k < n; k++) {
     rows[k].v_lag_1h = k >= 4 ? rows[k - 4].voltage : NaN;
@@ -1059,11 +1064,17 @@ document.querySelectorAll('input[name="hvsrc"]').forEach(r => r.addEventListener
   if (!r.checked) return;
   const csv = r.value === "csv";
   $("hvBox").hidden = !csv;
+  $("hvSunField").hidden = csv;
   $("hvHint").textContent = csv
     ? "ใช้แรงดัน 22 kV จากไฟล์ ความต่างจากค่าจำลองจะส่งผ่านหม้อแปลงไปยังแรงดันด้านแรงต่ำตามอัตราส่วน"
-    : "คำนวณจากโหลดและ PV: 22,100 + 0.1·PV·(PV/kVA) − 0.05·โหลด (V)";
+    : "แรงดัน 22 kV ขึ้นตามความเข้มแสงอาทิตย์ของพื้นที่ที่เลือก (PV จำนวนมากบนสายป้อนจ่ายไฟย้อน) และตกตามโหลด แล้วส่งผ่านหม้อแปลงไปยังด้านแรงต่ำ";
   markStale();
 }));
+$("hvSun").addEventListener("input", () => {
+  const v = +$("hvSun").value;
+  $("hvSunTxt").textContent = `+${v.toFixed(1)}% (+${Math.round(22000 * v / 100)} V)`;
+  markStale();
+});
 function parseHvCsv(text) {
   const lines = text.replace(/^\uFEFF/, "").split(/\r?\n/).map(l => l.trim()).filter(Boolean);
   const vals = [], times = [];
@@ -1207,8 +1218,8 @@ async function run(e) {
     hv = new Float64Array(days * 96);
     for (let k = 0; k < hv.length; k++) hv[k] = hvData.values[k % hvData.values.length];
     log(`HV 22 kV           : CSV "${hvData.name}" (${hvData.days} day profile${hvData.days > 1 ? "s" : ""}, cycled)`);
-  } else log("HV 22 kV           : simulated from load and PV");
-  const rows = buildDataset({ lat, lon, trafo, pv, target, hv, vScale: ph.nominal / 400, noiseKw: ph === PHASE[1] ? 5 * trafo / 500 : 5, start: s0, days, cloud: +$("cloud").value / 100, ghi });
+  } else log(`HV 22 kV           : simulated, +${(+$("hvSun").value).toFixed(1)}% per 1000 W/m2 of local irradiance`);
+  const rows = buildDataset({ lat, lon, trafo, pv, target, hv, hvSun: hv ? 0 : +$("hvSun").value / 100, vScale: ph.nominal / 400, noiseKw: ph === PHASE[1] ? 5 * trafo / 500 : 5, start: s0, days, cloud: +$("cloud").value / 100, ghi });
   const P = prepare(rows);
   log(`Samples            : ${rows.length}  (train ${P.train.length} / test ${P.test.length})`);
   log("");
@@ -1240,7 +1251,7 @@ async function run(e) {
   const all = P.train.concat(P.test), pred = predTr.concat(predTe);
   const dayList = [];
   for (let i = 0; i + 96 <= all.length; i += 96) dayList.push({ start: i, set: i < P.split ? "train" : "test", r: all[i] });
-  state.model = { all, pred, dayList, split: P.split, history, mTr, mTe, trafo, pv, hvName: hv ? hvData.name : "" };
+  state.model = { all, pred, dayList, split: P.split, history, mTr, mTe, trafo, pv, hvName: hv ? hvData.name : "", hvSun: +$("hvSun").value };
   $("kTest").textContent = mTe.rmse.toFixed(2) + " V";
   $("kTestSub").innerHTML = `RMSE · MAE <span class="num">${mTe.mae.toFixed(2)} V</span> · ${P.test.length / 96} วัน`;
   $("kTrain").textContent = mTr.rmse.toFixed(2) + " V";
@@ -1323,7 +1334,7 @@ function renderDay() {
     series: [{ y: sunAt, color: cssVar("--sun"), fill: cssVar("--sun-soft"), width: 1.5, name: "แสงแดด" }] });
   c2.set({ ...base, tipFmt: v => v.toFixed(1) + " V",
     series: [{ y: rows.map(r => r.v22), color: cssVar("--hv"), width: 1.8, name: "22 kV" }] });
-  $("t2sub").textContent = m.hvName ? `นำเข้าจาก ${m.hvName}` : "จำลองโดยระบบ";
+  $("t2sub").textContent = m.hvName ? `นำเข้าจาก ${m.hvName}` : `จำลองจากแดดในพื้นที่ · +${m.hvSun.toFixed(1)}% ต่อ 1,000 W/m² · สูงสุด ${Math.max(...rows.map(r => r.v22)).toFixed(0)} V เวลา ${fmtHM(rows[rows.map(r => r.v22).indexOf(Math.max(...rows.map(r => r.v22)))].hour)}`;
   const tapColors = [1, 2, 3, 4, 5].map(i => cssVar("--tap" + i));
   const lim = [{ y: vmin, color: cssVar("--over") }, { y: vmax, color: cssVar("--over") }];
   c3.set({ ...base, hlines: lim, tipFmt: v => v.toFixed(1) + " V",
