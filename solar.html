@@ -1,0 +1,802 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Solar Day Calculator</title>
+<style>
+  :root {
+    color-scheme: light;
+    --bg: #f4f4f1;
+    --surface: #fcfcfb;
+    --border: #e2e1dc;
+    --grid: #ebeae5;
+    --text: #0b0b0b;
+    --text-2: #52514e;
+    --text-3: #7a7974;
+    --accent: #2a78d6;
+    --series-1: #2a78d6;
+    --series-2: #eb6834;
+    --night: rgba(40, 40, 60, 0.05);
+    --sun: #eda100;
+    --input-bg: #ffffff;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      color-scheme: dark;
+      --bg: #121211;
+      --surface: #1a1a19;
+      --border: #2e2e2c;
+      --grid: #272725;
+      --text: #ffffff;
+      --text-2: #c3c2b7;
+      --text-3: #8e8d85;
+      --accent: #3987e5;
+      --series-1: #3987e5;
+      --series-2: #d95926;
+      --night: rgba(0, 0, 0, 0.25);
+      --sun: #c98500;
+      --input-bg: #222220;
+    }
+  }
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+    --bg: #121211;
+    --surface: #1a1a19;
+    --border: #2e2e2c;
+    --grid: #272725;
+    --text: #ffffff;
+    --text-2: #c3c2b7;
+    --text-3: #8e8d85;
+    --accent: #3987e5;
+    --series-1: #3987e5;
+    --series-2: #d95926;
+    --night: rgba(0, 0, 0, 0.25);
+    --sun: #c98500;
+    --input-bg: #222220;
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: "Segoe UI", "Noto Sans Thai", "Sarabun", Tahoma, system-ui, sans-serif;
+    font-size: 15px;
+    line-height: 1.5;
+  }
+  .wrap { max-width: 1180px; margin: 0 auto; padding: 24px 16px 48px; }
+  header h1 { margin: 0 0 4px; font-size: 1.6rem; font-weight: 650; letter-spacing: -0.01em; }
+  header p { margin: 0 0 20px; color: var(--text-2); }
+
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 18px;
+    margin-bottom: 16px;
+  }
+  .card h2 { margin: 0 0 12px; font-size: 1.05rem; font-weight: 600; }
+
+  .form-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+    gap: 12px 14px;
+  }
+  label { display: flex; flex-direction: column; gap: 4px; font-size: 0.85rem; color: var(--text-2); }
+  label small { color: var(--text-3); font-size: 0.75rem; }
+  input, select {
+    font: inherit;
+    color: var(--text);
+    background: var(--input-bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 8px 10px;
+    min-width: 0;
+    width: 100%;
+  }
+  input:focus, select:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
+  .section-label {
+    grid-column: 1 / -1;
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--text-3);
+    margin-top: 6px;
+    border-top: 1px solid var(--border);
+    padding-top: 12px;
+  }
+  .section-label:first-child { margin-top: 0; border-top: 0; padding-top: 0; }
+
+  .actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 16px; }
+  button {
+    font: inherit;
+    border-radius: 8px;
+    padding: 8px 14px;
+    border: 1px solid var(--border);
+    background: var(--input-bg);
+    color: var(--text);
+    cursor: pointer;
+  }
+  button:hover { border-color: var(--text-3); }
+  button.primary { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600; }
+  button.primary:hover { filter: brightness(1.08); }
+  .status { font-size: 0.85rem; color: var(--text-3); margin-top: 8px; min-height: 1.3em; }
+
+  .stats {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 10px;
+  }
+  .stat {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 12px 14px;
+  }
+  .stat .k { font-size: 0.78rem; color: var(--text-2); }
+  .stat .v { font-size: 1.35rem; font-weight: 650; font-variant-numeric: tabular-nums; margin-top: 2px; }
+  .stat .u { font-size: 0.8rem; color: var(--text-3); font-weight: 400; margin-left: 3px; }
+  .stat.hero .v { font-size: 1.7rem; color: var(--text); }
+  .stats-block { margin-bottom: 16px; }
+
+  .chart-head { display: flex; justify-content: space-between; align-items: baseline; flex-wrap: wrap; gap: 8px; margin-bottom: 6px; }
+  .chart-head h2 { margin: 0; }
+  .legend { display: flex; gap: 14px; flex-wrap: wrap; font-size: 0.82rem; color: var(--text-2); }
+  .legend span { display: inline-flex; align-items: center; gap: 6px; }
+  .legend i { width: 14px; height: 3px; border-radius: 2px; display: inline-block; }
+  .chart-box { position: relative; width: 100%; height: 280px; }
+  .chart-box canvas { width: 100%; height: 100%; display: block; }
+  .tooltip {
+    position: absolute;
+    pointer-events: none;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 8px 10px;
+    font-size: 0.8rem;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.12);
+    white-space: nowrap;
+    display: none;
+    z-index: 2;
+    font-variant-numeric: tabular-nums;
+  }
+  .tooltip b { display: block; margin-bottom: 2px; }
+  .tooltip .row { display: flex; align-items: center; gap: 6px; color: var(--text-2); }
+  .tooltip .row i { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
+  .tooltip .row em { font-style: normal; color: var(--text); margin-left: auto; padding-left: 10px; }
+
+  .table-wrap { overflow: auto; max-height: 520px; border: 1px solid var(--border); border-radius: 8px; }
+  table { border-collapse: collapse; width: 100%; font-size: 0.82rem; font-variant-numeric: tabular-nums; }
+  th, td { padding: 6px 10px; text-align: right; border-bottom: 1px solid var(--grid); white-space: nowrap; }
+  th:first-child, td:first-child { text-align: left; }
+  thead th {
+    position: sticky; top: 0;
+    background: var(--surface);
+    color: var(--text-2);
+    font-weight: 600;
+    border-bottom: 1px solid var(--border);
+    z-index: 1;
+  }
+  tbody tr.night td { color: var(--text-3); }
+  tbody tr.mark td { background: color-mix(in srgb, var(--sun) 12%, transparent); }
+  tbody tr:hover td { background: color-mix(in srgb, var(--accent) 10%, transparent); }
+
+  .note { font-size: 0.8rem; color: var(--text-3); margin-top: 10px; }
+  .theme-toggle { position: absolute; top: 20px; right: 16px; }
+  header { position: relative; padding-right: 56px; }
+
+  @media (max-width: 560px) {
+    .chart-box { height: 230px; }
+    header h1 { font-size: 1.3rem; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>☀️ คำนวณแสงอาทิตย์ &amp; ผลผลิต Solar Cell</h1>
+    <p>ใส่พิกัด Lat / Long เพื่อดูเวลาพระอาทิตย์ขึ้น–ตก ค่าความเข้มแสง และกำลังผลิตไฟฟ้าโดยประมาณ ทุก 15 นาที ตั้งแต่ 00:00 ถึง 24:00 น.</p>
+    <button class="theme-toggle" id="themeBtn" title="สลับโหมดสว่าง/มืด" aria-label="สลับธีม">🌓</button>
+  </header>
+
+  <section class="card">
+    <h2>ข้อมูลนำเข้า</h2>
+    <div class="form-grid">
+      <div class="section-label">ตำแหน่งและวันที่</div>
+      <label>ตำแหน่งตัวอย่าง
+        <select id="preset">
+          <option value="">— เลือก —</option>
+          <option value="13.7563,100.5018">กรุงเทพฯ</option>
+          <option value="18.7883,98.9853">เชียงใหม่</option>
+          <option value="16.4419,102.8360">ขอนแก่น</option>
+          <option value="12.9236,100.8825">พัทยา</option>
+          <option value="7.0086,100.4747">หาดใหญ่</option>
+          <option value="7.8804,98.3923">ภูเก็ต</option>
+        </select>
+      </label>
+      <label>ละติจูด (Lat)
+        <input id="lat" type="number" step="0.0001" min="-90" max="90" value="13.7563">
+      </label>
+      <label>ลองจิจูด (Long)
+        <input id="lon" type="number" step="0.0001" min="-180" max="180" value="100.5018">
+      </label>
+      <label>วันที่
+        <input id="date" type="date">
+      </label>
+      <label>เขตเวลา (UTC ±ชม.)
+        <input id="tz" type="number" step="0.25" min="-12" max="14" value="7">
+        <small>ประเทศไทย = +7</small>
+      </label>
+      <label>ความสูงจากระดับน้ำทะเล (ม.)
+        <input id="alt" type="number" step="1" min="0" max="8000" value="0">
+      </label>
+
+      <div class="section-label">ระบบโซลาร์เซลล์</div>
+      <label>ขนาดติดตั้ง (kWp)
+        <input id="kwp" type="number" step="0.1" min="0" value="5">
+      </label>
+      <label>มุมเอียงแผง (°)
+        <input id="tilt" type="number" step="1" min="0" max="90" value="15">
+        <small>0 = วางราบ</small>
+      </label>
+      <label>ทิศแผง Azimuth (°)
+        <input id="paz" type="number" step="1" min="0" max="360" value="180">
+        <small>0=เหนือ 90=ตะวันออก 180=ใต้ 270=ตะวันตก</small>
+      </label>
+      <label>Performance Ratio (%)
+        <input id="pr" type="number" step="1" min="10" max="100" value="85">
+        <small>การสูญเสียระบบ (inverter, สาย, ฝุ่น)</small>
+      </label>
+      <label>อุณหภูมิอากาศ (°C)
+        <input id="tamb" type="number" step="1" min="-30" max="55" value="32">
+        <small>ใช้คำนวณความร้อนของแผง</small>
+      </label>
+      <label>สภาพท้องฟ้า (% ท้องฟ้าแจ่มใส)
+        <input id="sky" type="number" step="5" min="0" max="100" value="100">
+        <small>100 = ไม่มีเมฆ</small>
+      </label>
+    </div>
+    <div class="actions">
+      <button class="primary" id="calcBtn">คำนวณ</button>
+      <button id="geoBtn">📍 ใช้ตำแหน่งปัจจุบัน</button>
+      <button id="todayBtn">วันนี้</button>
+      <button id="tzBtn">ใช้เขตเวลาของเครื่อง</button>
+      <button id="csvBtn">⬇️ Export .CSV</button>
+    </div>
+    <div class="status" id="status"></div>
+  </section>
+
+  <div class="stats stats-block" id="stats"></div>
+
+  <section class="card">
+    <div class="chart-head">
+      <h2>ค่าความเข้มแสงอาทิตย์ (W/m²)</h2>
+      <div class="legend">
+        <span><i style="background:var(--series-1)"></i>GHI บนพื้นราบ</span>
+        <span><i style="background:var(--series-2)"></i>POA บนหน้าแผง</span>
+      </div>
+    </div>
+    <div class="chart-box" id="chartIrr"><canvas></canvas><div class="tooltip"></div></div>
+  </section>
+
+  <section class="card">
+    <div class="chart-head">
+      <h2>กำลังผลิตไฟฟ้า (kW)</h2>
+      <div class="legend" id="powerLegend"></div>
+    </div>
+    <div class="chart-box" id="chartPow"><canvas></canvas><div class="tooltip"></div></div>
+  </section>
+
+  <section class="card">
+    <div class="chart-head">
+      <h2>ตารางข้อมูลทุก 15 นาที</h2>
+      <button id="csvBtn2">⬇️ Export .CSV</button>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>เวลา</th>
+            <th>มุมเงย (°)</th>
+            <th>Azimuth (°)</th>
+            <th>GHI (W/m²)</th>
+            <th>DNI (W/m²)</th>
+            <th>DHI (W/m²)</th>
+            <th>POA (W/m²)</th>
+            <th>ความสว่าง (lux)</th>
+            <th>กำลังผลิต (kW)</th>
+            <th>พลังงาน 15 นาที (kWh)</th>
+            <th>พลังงานสะสม (kWh)</th>
+          </tr>
+        </thead>
+        <tbody id="tbody"></tbody>
+      </table>
+    </div>
+    <p class="note">
+      ตำแหน่งดวงอาทิตย์ใช้สูตร NOAA Solar Calculator · ความเข้มแสงเป็นแบบจำลองท้องฟ้าแจ่มใส (Meinel + Kasten–Young air mass, diffuse ≈ 10% ของ DNI)
+      คูณด้วย % สภาพท้องฟ้า · POA ใช้แบบจำลอง isotropic sky, albedo 0.2 · กำลังผลิตคิดค่าสัมประสิทธิ์อุณหภูมิ −0.4%/°C (NOCT 45 °C)
+      · ความสว่าง (lux) ≈ GHI × 110 lm/W · "พลังงาน 15 นาที" คือช่วงตั้งแต่เวลาในแถวนั้นถึง 15 นาทีถัดไป
+      · ผลลัพธ์เป็นค่าประมาณสำหรับการประเมินเบื้องต้น ค่าจริงขึ้นกับเมฆ ฝุ่น ความชื้น และเงาบัง
+    </p>
+  </section>
+</div>
+
+<script>
+(() => {
+  'use strict';
+  const $ = (id) => document.getElementById(id);
+  const rad = (d) => d * Math.PI / 180;
+  const deg = (r) => r * 180 / Math.PI;
+  const STEP = 15;                 // นาที
+  const STORE_KEY = 'solar-calc-inputs-v1';
+  const FIELDS = ['lat', 'lon', 'date', 'tz', 'alt', 'kwp', 'tilt', 'paz', 'pr', 'tamb', 'sky'];
+
+  let lastResult = null;
+
+  /* ---------- NOAA solar position ---------- */
+  function sunCore(jd) {
+    const T = (jd - 2451545.0) / 36525.0;
+    const L0 = ((280.46646 + T * (36000.76983 + T * 0.0003032)) % 360 + 360) % 360;
+    const M = 357.52911 + T * (35999.05029 - 0.0001537 * T);
+    const e = 0.016708634 - T * (0.000042037 + 0.0000001267 * T);
+    const Mr = rad(M);
+    const C = Math.sin(Mr) * (1.914602 - T * (0.004817 + 0.000014 * T))
+            + Math.sin(2 * Mr) * (0.019993 - 0.000101 * T)
+            + Math.sin(3 * Mr) * 0.000289;
+    const trueLong = L0 + C;
+    const omega = 125.04 - 1934.136 * T;
+    const lambda = trueLong - 0.00569 - 0.00478 * Math.sin(rad(omega));
+    const eps0 = 23 + (26 + (21.448 - T * (46.815 + T * (0.00059 - T * 0.001813))) / 60) / 60;
+    const eps = eps0 + 0.00256 * Math.cos(rad(omega));
+    const decl = deg(Math.asin(Math.sin(rad(eps)) * Math.sin(rad(lambda))));
+    const y = Math.tan(rad(eps / 2)) ** 2;
+    const L0r = rad(L0);
+    const eqTime = 4 * deg(
+      y * Math.sin(2 * L0r) - 2 * e * Math.sin(Mr)
+      + 4 * e * y * Math.sin(Mr) * Math.cos(2 * L0r)
+      - 0.5 * y * y * Math.sin(4 * L0r)
+      - 1.25 * e * e * Math.sin(2 * Mr)
+    );
+    return { decl, eqTime };
+  }
+
+  // จูเลียนเดย์ของเวลาท้องถิ่น (นาทีนับจากเที่ยงคืน) ของวันที่ที่เลือก
+  function jdFor(dateUTC0, minutes, tz) {
+    const ms = dateUTC0 + (minutes - tz * 60) * 60000;
+    return ms / 86400000 + 2440587.5;
+  }
+
+  function sunPosition(lat, lon, tz, dateUTC0, minutes) {
+    const { decl, eqTime } = sunCore(jdFor(dateUTC0, minutes, tz));
+    let tst = (minutes + eqTime + 4 * lon - 60 * tz) % 1440;
+    if (tst < 0) tst += 1440;
+    let ha = tst / 4 - 180;
+    const latR = rad(lat), decR = rad(decl), haR = rad(ha);
+    let cosZ = Math.sin(latR) * Math.sin(decR) + Math.cos(latR) * Math.cos(decR) * Math.cos(haR);
+    cosZ = Math.min(1, Math.max(-1, cosZ));
+    const zen = deg(Math.acos(cosZ));
+    const elev = 90 - zen;
+
+    // การหักเหของบรรยากาศ (NOAA)
+    let refr = 0;
+    if (elev <= 85) {
+      const te = Math.tan(rad(elev));
+      if (elev > 5) refr = 58.1 / te - 0.07 / te ** 3 + 0.000086 / te ** 5;
+      else if (elev > -0.575) refr = 1735 + elev * (-518.2 + elev * (103.4 + elev * (-12.79 + elev * 0.711)));
+      else refr = -20.772 / te;
+      refr /= 3600;
+    }
+    const appElev = elev + refr;
+
+    let az = deg(Math.atan2(Math.sin(haR), Math.cos(haR) * Math.sin(latR) - Math.tan(decR) * Math.cos(latR))) + 180;
+    az = (az + 360) % 360;
+    return { elev: appElev, az, decl, eqTime };
+  }
+
+  // เวลาขึ้น/ตก (นาทีท้องถิ่น) ด้วยการวนซ้ำ; คืนค่า null หากเป็นกลางวัน/กลางคืนตลอดวัน
+  function riseSet(lat, lon, tz, dateUTC0) {
+    const zenith = rad(90.833);
+    const noonAt = (m) => {
+      const { eqTime } = sunCore(jdFor(dateUTC0, m, tz));
+      return 720 - 4 * lon - eqTime + 60 * tz;
+    };
+    let noon = noonAt(720);
+    noon = noonAt(noon);
+
+    const event = (sign) => {
+      let t = noon;
+      for (let i = 0; i < 4; i++) {
+        const { decl, eqTime } = sunCore(jdFor(dateUTC0, t, tz));
+        const latR = rad(lat), decR = rad(decl);
+        const cosH = Math.cos(zenith) / (Math.cos(latR) * Math.cos(decR)) - Math.tan(latR) * Math.tan(decR);
+        if (cosH > 1) return { polar: 'night' };
+        if (cosH < -1) return { polar: 'day' };
+        const H = deg(Math.acos(cosH));
+        t = 720 - 4 * (lon + sign * H) - eqTime + 60 * tz;
+      }
+      return { t };
+    };
+    // sign +1 → sunrise (ha negative side), -1 → sunset
+    const rise = event(1);
+    const set = event(-1);
+    return { noon, rise, set };
+  }
+
+  /* ---------- Clear-sky irradiance ---------- */
+  function irradiance(elev, doy, altKm) {
+    if (elev <= 0) return { ghi: 0, dni: 0, dhi: 0 };
+    const zenDeg = 90 - elev;
+    const cosZ = Math.cos(rad(zenDeg));
+    const am = 1 / (cosZ + 0.50572 * Math.pow(96.07995 - zenDeg, -1.6364));
+    const I0 = 1361 * (1 + 0.033 * Math.cos(2 * Math.PI * doy / 365));
+    const h = Math.min(altKm, 3);
+    const dni = I0 * ((1 - 0.14 * h) * Math.pow(0.7, Math.pow(am, 0.678)) + 0.14 * h);
+    const dhi = 0.1 * dni;
+    const ghi = dni * cosZ + dhi;
+    return { ghi, dni, dhi };
+  }
+
+  function poa(irr, elev, sunAz, tilt, panelAz) {
+    if (elev <= 0) return 0;
+    const z = rad(90 - elev), b = rad(tilt);
+    const cosAOI = Math.cos(z) * Math.cos(b) + Math.sin(z) * Math.sin(b) * Math.cos(rad(sunAz - panelAz));
+    const beam = irr.dni * Math.max(0, cosAOI);
+    const diff = irr.dhi * (1 + Math.cos(b)) / 2;
+    const refl = irr.ghi * 0.2 * (1 - Math.cos(b)) / 2;
+    return Math.max(0, beam + diff + refl);
+  }
+
+  /* ---------- Main compute ---------- */
+  function readInputs() {
+    const num = (id) => parseFloat($(id).value);
+    const inp = {
+      lat: num('lat'), lon: num('lon'), tz: num('tz'), alt: num('alt') || 0,
+      kwp: num('kwp'), tilt: num('tilt'), paz: num('paz'), pr: num('pr'),
+      tamb: num('tamb'), sky: num('sky'), date: $('date').value
+    };
+    const errs = [];
+    if (!(inp.lat >= -90 && inp.lat <= 90)) errs.push('ละติจูดต้องอยู่ระหว่าง −90 ถึง 90');
+    if (!(inp.lon >= -180 && inp.lon <= 180)) errs.push('ลองจิจูดต้องอยู่ระหว่าง −180 ถึง 180');
+    if (!(inp.tz >= -12 && inp.tz <= 14)) errs.push('เขตเวลาไม่ถูกต้อง');
+    if (!inp.date) errs.push('กรุณาเลือกวันที่');
+    ['kwp', 'tilt', 'paz', 'pr', 'tamb', 'sky'].forEach((k) => { if (!Number.isFinite(inp[k])) errs.push(`ค่า ${k} ไม่ถูกต้อง`); });
+    return { inp, errs };
+  }
+
+  function compute(inp) {
+    const [Y, Mo, D] = inp.date.split('-').map(Number);
+    const dateUTC0 = Date.UTC(Y, Mo - 1, D);
+    const doy = Math.round((dateUTC0 - Date.UTC(Y, 0, 0)) / 86400000);
+    const skyF = Math.min(1, Math.max(0, inp.sky / 100));
+    const prF = inp.pr / 100;
+    const rows = [];
+
+    for (let m = 0; m <= 1440; m += STEP) {
+      const pos = sunPosition(inp.lat, inp.lon, inp.tz, dateUTC0, m);
+      const cs = irradiance(pos.elev, doy, inp.alt / 1000);
+      const irr = { ghi: cs.ghi * skyF, dni: cs.dni * skyF, dhi: cs.dhi * skyF };
+      const g = poa(irr, pos.elev, pos.az, inp.tilt, inp.paz);
+      const tCell = inp.tamb + g / 800 * (45 - 20);
+      const tempF = Math.max(0, 1 - 0.004 * (tCell - 25));
+      const pw = g > 0 ? inp.kwp * (g / 1000) * tempF * prF : 0;
+      rows.push({
+        m, elev: pos.elev, az: pos.az,
+        ghi: irr.ghi, dni: irr.dni, dhi: irr.dhi, poa: g,
+        lux: irr.ghi * 110, tCell: g > 0 ? tCell : null, power: pw
+      });
+    }
+    // พลังงานรายช่วง (trapezoid) และสะสม
+    let cum = 0, ghiSum = 0, poaSum = 0;
+    for (let i = 0; i < rows.length; i++) {
+      if (i < rows.length - 1) {
+        const e = (rows[i].power + rows[i + 1].power) / 2 * (STEP / 60);
+        rows[i].energy = e;
+        ghiSum += (rows[i].ghi + rows[i + 1].ghi) / 2 * (STEP / 60);
+        poaSum += (rows[i].poa + rows[i + 1].poa) / 2 * (STEP / 60);
+        cum += e;
+        rows[i].cum = cum;
+      } else {
+        rows[i].energy = null;
+        rows[i].cum = cum;
+      }
+    }
+    const rs = riseSet(inp.lat, inp.lon, inp.tz, dateUTC0);
+    let peak = rows[0], maxElev = rows[0];
+    rows.forEach((r) => { if (r.power > peak.power) peak = r; if (r.elev > maxElev.elev) maxElev = r; });
+    const noonPos = sunPosition(inp.lat, inp.lon, inp.tz, dateUTC0, rs.noon);
+    return {
+      inp, rows, rs, peak, noonElev: noonPos.elev,
+      energy: cum, ghiDaily: ghiSum / 1000, poaDaily: poaSum / 1000,
+      maxGhi: Math.max(...rows.map((r) => r.ghi))
+    };
+  }
+
+  /* ---------- Formatting ---------- */
+  const fmtHM = (min) => {
+    if (min == null || !Number.isFinite(min)) return '—';
+    let m = Math.round(min);
+    const dayShift = m < 0 ? ' (−1 วัน)' : m >= 1440 ? ' (+1 วัน)' : '';
+    m = ((m % 1440) + 1440) % 1440;
+    return String(Math.floor(m / 60)).padStart(2, '0') + ':' + String(m % 60).padStart(2, '0') + dayShift;
+  };
+  const rowTime = (m) => m === 1440 ? '24:00' : fmtHM(m);
+  const f = (v, d) => (v == null || !Number.isFinite(v)) ? '' : v.toFixed(d);
+  const fmtNum = (v, d) => (v == null || !Number.isFinite(v)) ? '—'
+    : v.toLocaleString('th-TH', { minimumFractionDigits: d, maximumFractionDigits: d });
+
+  /* ---------- Render ---------- */
+  function renderStats(res) {
+    const { rs } = res;
+    let riseTxt, setTxt, dayLen;
+    if (rs.rise.polar === 'day' || rs.set.polar === 'day') {
+      riseTxt = setTxt = 'ไม่ตก'; dayLen = '24:00';
+    } else if (rs.rise.polar === 'night' || rs.set.polar === 'night') {
+      riseTxt = setTxt = 'ไม่ขึ้น'; dayLen = '0:00';
+    } else {
+      riseTxt = fmtHM(rs.rise.t); setTxt = fmtHM(rs.set.t);
+      const L = Math.round(rs.set.t - rs.rise.t);
+      dayLen = `${Math.floor(L / 60)}:${String(L % 60).padStart(2, '0')}`;
+    }
+    const cards = [
+      ['พระอาทิตย์ขึ้น', riseTxt, 'น.'],
+      ['เที่ยงสุริยะ', fmtHM(rs.noon), 'น.'],
+      ['พระอาทิตย์ตก', setTxt, 'น.'],
+      ['ความยาวกลางวัน', dayLen, 'ชม.:นาที'],
+      ['มุมเงยสูงสุด', fmtNum(res.noonElev, 1), '°'],
+      ['GHI สูงสุด', fmtNum(res.maxGhi, 0), 'W/m²'],
+      ['รังสีรวมบนพื้นราบ', fmtNum(res.ghiDaily, 2), 'kWh/m²'],
+      ['Peak Sun Hours (หน้าแผง)', fmtNum(res.poaDaily, 2), 'ชม.'],
+      [`กำลังผลิตสูงสุด (${rowTime(res.peak.m)} น.)`, fmtNum(res.peak.power, 2), 'kW'],
+      ['พลังงานไฟฟ้าทั้งวัน', fmtNum(res.energy, 2), 'kWh', true],
+      ['ผลผลิตจำเพาะ', fmtNum(res.inp.kwp > 0 ? res.energy / res.inp.kwp : NaN, 2), 'kWh/kWp'],
+    ];
+    $('stats').innerHTML = cards.map(([k, v, u, hero]) =>
+      `<div class="stat${hero ? ' hero' : ''}"><div class="k">${k}</div><div class="v">${v}<span class="u">${u}</span></div></div>`
+    ).join('');
+  }
+
+  function renderTable(res) {
+    const { rs } = res;
+    const riseM = rs.rise.t, setM = rs.set.t;
+    const html = res.rows.map((r) => {
+      const isNight = r.elev <= 0;
+      const isMark = Number.isFinite(riseM) && (
+        (riseM >= r.m && riseM < r.m + STEP) || (setM >= r.m && setM < r.m + STEP));
+      return `<tr class="${isNight ? 'night' : ''}${isMark ? ' mark' : ''}">
+        <td>${rowTime(r.m)}</td>
+        <td>${f(r.elev, 2)}</td>
+        <td>${f(r.az, 1)}</td>
+        <td>${f(r.ghi, 1)}</td>
+        <td>${f(r.dni, 1)}</td>
+        <td>${f(r.dhi, 1)}</td>
+        <td>${f(r.poa, 1)}</td>
+        <td>${Math.round(r.lux).toLocaleString('th-TH')}</td>
+        <td>${f(r.power, 3)}</td>
+        <td>${r.energy == null ? '—' : f(r.energy, 3)}</td>
+        <td>${f(r.cum, 3)}</td>
+      </tr>`;
+    }).join('');
+    $('tbody').innerHTML = html;
+  }
+
+  /* ---------- Chart (canvas, no library) ---------- */
+  const cssVar = (n) => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+
+  function niceMax(v) {
+    if (v <= 0) return 1;
+    const p = Math.pow(10, Math.floor(Math.log10(v)));
+    const n = v / p;
+    const s = [1, 1.2, 1.5, 2, 2.5, 3, 4, 5, 6, 8, 10].find((c) => n <= c);
+    return s * p;
+  }
+
+  function drawChart(box, res, series, unit, decimals) {
+    const canvas = box.querySelector('canvas');
+    const tip = box.querySelector('.tooltip');
+    const dpr = window.devicePixelRatio || 1;
+    const W = box.clientWidth, H = box.clientHeight;
+    canvas.width = W * dpr; canvas.height = H * dpr;
+    const ctx = canvas.getContext('2d');
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+    const pad = { l: 48, r: 16, t: 14, b: 28 };
+    const pw = W - pad.l - pad.r, ph = H - pad.t - pad.b;
+    const rows = res.rows;
+    const maxV = niceMax(Math.max(...series.flatMap((s) => rows.map((r) => r[s.key]))) * 1.05);
+    const x = (m) => pad.l + (m / 1440) * pw;
+    const y = (v) => pad.t + ph - (v / maxV) * ph;
+
+    const colText3 = cssVar('--text-3'), colGrid = cssVar('--grid'), colBorder = cssVar('--border');
+    const font = '11px "Segoe UI", "Noto Sans Thai", Tahoma, sans-serif';
+
+    function paint(hoverIdx) {
+      ctx.clearRect(0, 0, W, H);
+
+      // night shading
+      ctx.fillStyle = cssVar('--night');
+      for (let i = 0; i < rows.length - 1; i++) {
+        if (rows[i].elev <= 0 && rows[i + 1].elev <= 0) ctx.fillRect(x(rows[i].m), pad.t, x(rows[i + 1].m) - x(rows[i].m) + 0.5, ph);
+      }
+
+      // grid + y ticks
+      ctx.font = font; ctx.fillStyle = colText3; ctx.textAlign = 'right'; ctx.textBaseline = 'middle';
+      ctx.strokeStyle = colGrid; ctx.lineWidth = 1;
+      for (let i = 0; i <= 4; i++) {
+        const v = maxV * i / 4, yy = Math.round(y(v)) + 0.5;
+        ctx.beginPath(); ctx.moveTo(pad.l, yy); ctx.lineTo(W - pad.r, yy); ctx.stroke();
+        ctx.fillText(v >= 100 ? Math.round(v) : +v.toFixed(2), pad.l - 6, yy);
+      }
+      // x ticks every 3h (every 6h on narrow)
+      const every = pw < 420 ? 360 : 180;
+      ctx.textAlign = 'center'; ctx.textBaseline = 'top';
+      for (let m = 0; m <= 1440; m += every) {
+        ctx.fillText(rowTime(m), x(m), pad.t + ph + 8);
+      }
+      ctx.strokeStyle = colBorder;
+      ctx.beginPath(); ctx.moveTo(pad.l, pad.t + ph + 0.5); ctx.lineTo(W - pad.r, pad.t + ph + 0.5); ctx.stroke();
+
+      // series
+      series.forEach((s) => {
+        const col = cssVar(s.color);
+        if (s.fill) {
+          ctx.beginPath(); ctx.moveTo(x(0), y(0));
+          rows.forEach((r) => ctx.lineTo(x(r.m), y(r[s.key])));
+          ctx.lineTo(x(1440), y(0)); ctx.closePath();
+          ctx.globalAlpha = 0.16; ctx.fillStyle = col; ctx.fill(); ctx.globalAlpha = 1;
+        }
+        ctx.beginPath();
+        rows.forEach((r, i) => i ? ctx.lineTo(x(r.m), y(r[s.key])) : ctx.moveTo(x(r.m), y(r[s.key])));
+        ctx.strokeStyle = col; ctx.lineWidth = 2; ctx.lineJoin = 'round'; ctx.stroke();
+      });
+
+      // hover
+      if (hoverIdx != null) {
+        const r = rows[hoverIdx], xx = x(r.m);
+        ctx.strokeStyle = colText3; ctx.lineWidth = 1; ctx.setLineDash([3, 3]);
+        ctx.beginPath(); ctx.moveTo(xx, pad.t); ctx.lineTo(xx, pad.t + ph); ctx.stroke(); ctx.setLineDash([]);
+        series.forEach((s) => {
+          ctx.beginPath(); ctx.arc(xx, y(r[s.key]), 4.5, 0, Math.PI * 2);
+          ctx.fillStyle = cssVar(s.color); ctx.fill();
+          ctx.lineWidth = 2; ctx.strokeStyle = cssVar('--surface'); ctx.stroke();
+        });
+      }
+    }
+    paint(null);
+
+    box.onmousemove = box.ontouchmove = (ev) => {
+      const pt = ev.touches ? ev.touches[0] : ev;
+      const rect = canvas.getBoundingClientRect();
+      const mx = pt.clientX - rect.left;
+      if (mx < pad.l - 10 || mx > W - pad.r + 10) { box.onmouseleave(); return; }
+      const m = Math.min(1440, Math.max(0, (mx - pad.l) / pw * 1440));
+      const idx = Math.round(m / STEP);
+      const r = rows[idx];
+      paint(idx);
+      tip.innerHTML = `<b>${rowTime(r.m)} น. · มุมเงย ${r.elev.toFixed(1)}°</b>` + series.map((s) =>
+        `<div class="row"><i style="background:${cssVar(s.color)}"></i>${s.label}<em>${fmtNum(r[s.key], decimals)} ${unit}</em></div>`
+      ).join('');
+      tip.style.display = 'block';
+      const tw = tip.offsetWidth;
+      let left = x(r.m) + 12;
+      if (left + tw > W) left = x(r.m) - tw - 12;
+      tip.style.left = Math.max(0, left) + 'px';
+      tip.style.top = pad.t + 4 + 'px';
+    };
+    box.onmouseleave = box.ontouchend = () => { paint(null); tip.style.display = 'none'; };
+  }
+
+  function renderCharts(res) {
+    drawChart($('chartIrr'), res, [
+      { key: 'ghi', label: 'GHI', color: '--series-1' },
+      { key: 'poa', label: 'POA', color: '--series-2' },
+    ], 'W/m²', 0);
+    $('powerLegend').textContent = `ระบบ ${fmtNum(res.inp.kwp, 1)} kWp · รวม ${fmtNum(res.energy, 2)} kWh`;
+    drawChart($('chartPow'), res, [
+      { key: 'power', label: 'กำลังผลิต', color: '--series-1', fill: true },
+    ], 'kW', 3);
+  }
+
+  /* ---------- CSV ---------- */
+  function exportCSV() {
+    if (!lastResult) run();
+    if (!lastResult) return;
+    const { inp, rows } = lastResult;
+    const header = ['Date', 'Time', 'Latitude', 'Longitude', 'UTC_Offset_h',
+      'Sun_Elevation_deg', 'Sun_Azimuth_deg', 'GHI_W_m2', 'DNI_W_m2', 'DHI_W_m2', 'POA_W_m2',
+      'Illuminance_lux', 'Cell_Temp_C', 'Power_kW', 'Energy_15min_kWh', 'Cumulative_Energy_kWh'];
+    const lines = [header.join(',')];
+    rows.forEach((r) => {
+      lines.push([
+        inp.date, rowTime(r.m), inp.lat, inp.lon, inp.tz,
+        f(r.elev, 3), f(r.az, 2), f(r.ghi, 2), f(r.dni, 2), f(r.dhi, 2), f(r.poa, 2),
+        Math.round(r.lux), r.tCell == null ? '' : f(r.tCell, 1),
+        f(r.power, 4), r.energy == null ? '' : f(r.energy, 4), f(r.cum, 4)
+      ].join(','));
+    });
+    const blob = new Blob(['﻿' + lines.join('\r\n')], { type: 'text/csv;charset=utf-8' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `solar_${inp.lat.toFixed(4)}_${inp.lon.toFixed(4)}_${inp.date}.csv`;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+    setStatus('ส่งออกไฟล์ CSV แล้ว (97 แถว, 00:00–24:00 ทุก 15 นาที)');
+  }
+
+  /* ---------- Wiring ---------- */
+  function setStatus(msg, isErr) {
+    $('status').textContent = msg;
+    $('status').style.color = isErr ? '#e34948' : '';
+  }
+
+  function saveInputs() {
+    try {
+      const o = {}; FIELDS.forEach((k) => { o[k] = $(k).value; });
+      localStorage.setItem(STORE_KEY, JSON.stringify(o));
+    } catch (e) { /* storage unavailable */ }
+  }
+  function loadInputs() {
+    try {
+      const o = JSON.parse(localStorage.getItem(STORE_KEY) || 'null');
+      if (o) FIELDS.forEach((k) => { if (o[k] != null && o[k] !== '' && k !== 'date') $(k).value = o[k]; });
+    } catch (e) { /* ignore */ }
+  }
+
+  function todayStr() {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  }
+
+  function run() {
+    const { inp, errs } = readInputs();
+    if (errs.length) { setStatus(errs.join(' · '), true); return; }
+    lastResult = compute(inp);
+    renderStats(lastResult);
+    renderCharts(lastResult);
+    renderTable(lastResult);
+    saveInputs();
+    setStatus(`คำนวณแล้ว: ${inp.lat.toFixed(4)}, ${inp.lon.toFixed(4)} · ${inp.date} · UTC${inp.tz >= 0 ? '+' : ''}${inp.tz}`);
+  }
+
+  $('date').value = todayStr();
+  loadInputs();
+
+  $('calcBtn').onclick = run;
+  $('csvBtn').onclick = exportCSV;
+  $('csvBtn2').onclick = exportCSV;
+  $('todayBtn').onclick = () => { $('date').value = todayStr(); run(); };
+  $('tzBtn').onclick = () => { $('tz').value = -new Date().getTimezoneOffset() / 60; run(); };
+  $('preset').onchange = (e) => {
+    if (!e.target.value) return;
+    const [la, lo] = e.target.value.split(',');
+    $('lat').value = la; $('lon').value = lo; $('tz').value = 7;
+    run();
+  };
+  $('geoBtn').onclick = () => {
+    if (!navigator.geolocation) { setStatus('เบราว์เซอร์นี้ไม่รองรับการระบุตำแหน่ง', true); return; }
+    setStatus('กำลังค้นหาตำแหน่ง…');
+    navigator.geolocation.getCurrentPosition((p) => {
+      $('lat').value = p.coords.latitude.toFixed(4);
+      $('lon').value = p.coords.longitude.toFixed(4);
+      run();
+    }, (err) => setStatus('ไม่สามารถระบุตำแหน่งได้: ' + err.message, true), { timeout: 10000 });
+  };
+  FIELDS.forEach((k) => $(k).addEventListener('keydown', (e) => { if (e.key === 'Enter') run(); }));
+  FIELDS.forEach((k) => $(k).addEventListener('change', run));
+
+  $('themeBtn').onclick = () => {
+    const root = document.documentElement;
+    const cur = root.dataset.theme || (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+    root.dataset.theme = cur === 'dark' ? 'light' : 'dark';
+    if (lastResult) renderCharts(lastResult);
+  };
+  matchMedia('(prefers-color-scheme: dark)').addEventListener?.('change', () => lastResult && renderCharts(lastResult));
+
+  let rt;
+  window.addEventListener('resize', () => { clearTimeout(rt); rt = setTimeout(() => lastResult && renderCharts(lastResult), 120); });
+
+  run();
+})();
+</script>
+</body>
+</html>
