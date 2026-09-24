@@ -172,6 +172,19 @@ input[type="range"] { width: 100%; accent-color: var(--accent); }
 .run { padding: 16px 18px; display: flex; flex-direction: column; gap: 10px; position: sticky; bottom: 0; background: var(--surface); }
 .progress { height: 6px; border-radius: 3px; background: var(--grid); overflow: hidden; }
 .progress i { display: block; height: 100%; width: 0; background: var(--accent); transition: width .15s; }
+.file {
+  display: flex; flex-direction: column; gap: 8px; padding: 10px; border-radius: 7px;
+  border: 1px dashed var(--line); background: var(--surface-2);
+}
+.file.drag { border-color: var(--accent); background: var(--accent-soft); }
+.file input[type="file"] { width: 100%; font-size: 12.5px; }
+.file input[type="file"]::file-selector-button {
+  font: inherit; margin-right: 10px; padding: 5px 10px; border-radius: 6px; cursor: pointer;
+  border: 1px solid var(--line); background: var(--surface); color: var(--ink);
+}
+.file .btn { padding: 5px 10px; font-size: 12.5px; }
+.file-stat { font-size: 12px; color: var(--muted); }
+.file-stat b { font-family: var(--f-mono); font-weight: 500; color: var(--ink); }
 details.adv summary { cursor: pointer; font-size: 12.5px; color: var(--muted); }
 details.adv[open] summary { margin-bottom: 10px; }
 
@@ -341,6 +354,22 @@ footer { max-width: 1440px; margin: 24px auto 0; color: var(--muted); font-size:
         </details>
       </section>
 
+      <section class="sect">
+        <h2><b>05</b>แรงดันไฟฟ้าแรงสูง <span style="text-transform:none">(22 kV)</span></h2>
+        <div class="seg" role="radiogroup" aria-label="แหล่งข้อมูลแรงดันแรงสูง">
+          <label><input type="radio" name="hvsrc" value="sim" checked><span>จำลองโดยระบบ</span></label>
+          <label><input type="radio" name="hvsrc" value="csv"><span>นำเข้าไฟล์ .CSV</span></label>
+        </div>
+        <p class="hint" id="hvHint">คำนวณจากโหลดและ PV: 22,100 + 0.1·PV·(PV/kVA) − 0.05·โหลด (V)</p>
+        <div class="file" id="hvBox" hidden>
+          <input type="file" id="hvFile" accept=".csv,text/csv,text/plain" aria-label="เลือกไฟล์ CSV แรงดันแรงสูง">
+          <div class="file-stat" id="hvStat">ยังไม่ได้เลือกไฟล์ · ลากไฟล์มาวางที่กรอบนี้ได้</div>
+          <div class="cv" style="height:70px" id="hvPrevWrap" hidden><canvas id="hvPrev"></canvas></div>
+          <button type="button" class="btn" id="hvTpl">ดาวน์โหลดไฟล์ตัวอย่าง (96 จุด)</button>
+          <p class="hint">รูปแบบ: <span class="mono">time,v22</span> ตั้งแต่ 00:00 ถึง 24:00 ทุก 15 นาที (96 หรือ 97 แถว) ค่าเป็น V หรือ kV ก็ได้ ถ้ามีหลายวัน (96×n แถว) จะใช้เรียงตามวันและวนซ้ำจนครบช่วงข้อมูล</p>
+        </div>
+      </section>
+
       <div class="run">
         <button type="submit" class="btn primary" id="runBtn">จำลองและฝึก LSTM</button>
         <div class="progress" aria-hidden="true"><i id="prog"></i></div>
@@ -376,7 +405,7 @@ footer { max-width: 1440px; margin: 24px auto 0; color: var(--muted); font-size:
     </section>
 
     <section class="panel">
-      <div class="panel-head"><h3><i>2</i>แรงดันด้านแรงสูง (สาย 22 kV)</h3>
+      <div class="panel-head"><h3><i>2</i>แรงดันด้านแรงสูง (สาย 22 kV)</h3><span class="sub" id="t2sub"></span>
         <div class="legend"><span><i style="background:var(--hv)"></i>v22 (V)</span></div></div>
       <div class="cv" style="height:130px"><canvas id="c2"></canvas></div>
     </section>
@@ -517,8 +546,11 @@ function buildDataset(o) {
     r.sunlight = sun[k];
     r.solar_kw = sun[k] * P;
     r.load_kw = T * 0.3 + T * 0.1 * Math.sin(2 * Math.PI * (hr - 14) / 24) + loadNoise[k] * (o.noiseKw ?? 5);
-    r.v22 = 22100 + r.solar_kw * 0.1 * (P / T) - r.load_kw * 0.05;
+    const v22sim = 22100 + r.solar_kw * 0.1 * (P / T) - r.load_kw * 0.05;
+    r.v22 = o.hv ? o.hv[k] : v22sim;
     r.voltage = V + ((r.solar_kw / T * 60) - ((r.load_kw - T * 0.3) / T * 25) + vNoise[k] * 1.5) * (o.vScale ?? 1);
+    // imported HV: its deviation from the simulated line passes to the LV side through the turns ratio
+    if (o.hv) r.voltage += V * (o.hv[k] / v22sim - 1);
   }
   for (let k = 0; k < n; k++) {
     rows[k].v_lag_1h = k >= 4 ? rows[k - 4].voltage : NaN;
@@ -1020,6 +1052,83 @@ document.querySelectorAll('input[name="src"]').forEach(r => r.addEventListener("
   markStale();
 }));
 
+/* ================= HV CSV import ================= */
+let hvData = null;
+const hvPrev = new Chart($("hvPrev"), null);
+document.querySelectorAll('input[name="hvsrc"]').forEach(r => r.addEventListener("change", () => {
+  if (!r.checked) return;
+  const csv = r.value === "csv";
+  $("hvBox").hidden = !csv;
+  $("hvHint").textContent = csv
+    ? "ใช้แรงดัน 22 kV จากไฟล์ ความต่างจากค่าจำลองจะส่งผ่านหม้อแปลงไปยังแรงดันด้านแรงต่ำตามอัตราส่วน"
+    : "คำนวณจากโหลดและ PV: 22,100 + 0.1·PV·(PV/kVA) − 0.05·โหลด (V)";
+  markStale();
+}));
+function parseHvCsv(text) {
+  const lines = text.replace(/^\uFEFF/, "").split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+  const vals = [], times = [];
+  for (const line of lines) {
+    const cells = line.split(/[,;\t]/).map(c => c.trim().replace(/^"|"$/g, ""));
+    const v = parseFloat(cells[cells.length - 1]);
+    if (!isFinite(v)) continue; // header or blank
+    vals.push(v);
+    const tm = cells.length > 1 && cells[0].match(/(\d{1,2})[:.](\d{2})/);
+    times.push(tm ? +tm[1] * 60 + +tm[2] : null);
+  }
+  if (!vals.length) throw new Error("ไม่พบตัวเลขแรงดันในไฟล์");
+  // 97 rows = 00:00 ... 24:00 per day: drop the 24:00 point (it is the next day's 00:00)
+  if (vals.length % 97 === 0 && vals.length % 96 !== 0) {
+    for (let d = vals.length / 97 - 1; d >= 0; d--) { vals.splice(d * 97 + 96, 1); times.splice(d * 97 + 96, 1); }
+  }
+  if (vals.length % 96 !== 0) throw new Error(`มี ${vals.length} ค่า ต้องเป็น 96 หรือ 97 แถวต่อวัน (00:00–24:00 ทุก 15 นาที)`);
+  for (let i = 0; i < times.length; i++) {
+    if (times[i] !== null && times[i] % 1440 !== (i % 96) * 15)
+      throw new Error(`แถวที่ ${i + 1}: เวลาควรเป็น ${fmtHM((i % 96) / 4)} ตรวจสอบว่าเรียงทุก 15 นาทีโดยไม่ขาดแถว`);
+  }
+  const sorted = vals.slice().sort((a, b) => a - b), med = sorted[sorted.length >> 1];
+  const k = med < 100 ? 1000 : 1; // kV -> V
+  const values = vals.map(v => v * k);
+  const lo = Math.min(...values), hi = Math.max(...values);
+  if (lo < 15000 || hi > 30000) throw new Error(`ค่าอยู่ช่วง ${lo.toFixed(0)}–${hi.toFixed(0)} V ซึ่งไม่ใช่ระดับ 22 kV`);
+  return { values, days: values.length / 96, lo, hi, mean: values.reduce((a, b) => a + b, 0) / values.length, kv: k === 1000 };
+}
+async function loadHvFile(file) {
+  const stat = $("hvStat");
+  try {
+    const d = parseHvCsv(await file.text());
+    hvData = { ...d, name: file.name };
+    stat.innerHTML = `<b>${file.name}</b> · ${d.values.length} จุด (${d.days} วัน)${d.kv ? " · แปลง kV→V" : ""}<br>ต่ำสุด <b>${d.lo.toFixed(0)}</b> · เฉลี่ย <b>${d.mean.toFixed(0)}</b> · สูงสุด <b>${d.hi.toFixed(0)}</b> V`;
+    stat.style.color = "";
+    $("hvPrevWrap").hidden = false;
+    const x = d.values.map((_, i) => i / 4);
+    hvPrev.set({ x, xMin: 0, xMax: Math.max(23.75, x[x.length - 1]), xTicks: d.days > 1 ? [] : [0, 6, 12, 18], xFmt: fmtHM,
+      tipHead: i => (d.days > 1 ? `วันที่ ${Math.floor(i / 96) + 1} ` : "") + fmtHM((i % 96) / 4), tipFmt: v => v.toFixed(0) + " V",
+      series: [{ y: d.values, color: cssVar("--hv"), width: 1.4, name: "22 kV" }] });
+    markStale();
+  } catch (err) {
+    hvData = null; $("hvPrevWrap").hidden = true;
+    stat.textContent = `นำเข้าไม่สำเร็จ: ${err.message}`; stat.style.color = "var(--over)";
+  }
+}
+$("hvFile").addEventListener("change", e => { const f = e.target.files[0]; if (f) loadHvFile(f); });
+const hvBox = $("hvBox");
+hvBox.addEventListener("dragover", e => { e.preventDefault(); hvBox.classList.add("drag"); });
+hvBox.addEventListener("dragleave", () => hvBox.classList.remove("drag"));
+hvBox.addEventListener("drop", e => { e.preventDefault(); hvBox.classList.remove("drag"); const f = e.dataTransfer.files[0]; if (f) loadHvFile(f); });
+$("hvTpl").addEventListener("click", () => {
+  // ตัวอย่าง: โปรไฟล์ 22 kV หนึ่งวัน แรงดันตกช่วงหัวค่ำ (โหลดสูงสุด) และยกขึ้นช่วงเที่ยง
+  const rows = ["time,v22"];
+  for (let i = 0; i <= 96; i++) {
+    const h = i / 4;
+    const v = 22100 + 180 * Math.exp(-((h - 12.5) ** 2) / 8) - 260 * Math.exp(-((h - 19.5) ** 2) / 3) + 40 * Math.sin(h / 24 * 2 * Math.PI);
+    rows.push(`${i === 96 ? "24:00" : fmtHM(h)},${v.toFixed(1)}`);
+  }
+  const url = URL.createObjectURL(new Blob([rows.join("\n") + "\n"], { type: "text/csv" }));
+  const a = Object.assign(document.createElement("a"), { href: url, download: "hv_22kV_profile.csv" });
+  document.body.append(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+});
+
 const state = { model: null, busy: false };
 function setStatus(cls, text) { const s = $("status"); s.className = "pill " + cls; s.textContent = text; }
 function markStale() { if (state.model && !state.busy) setStatus("stale", "ค่าตั้งเปลี่ยน กดจำลองใหม่"); }
@@ -1087,7 +1196,19 @@ async function run(e) {
   }
   if (!ghi) log(`Irradiance         : NOAA clear-sky model, cloud ${$("cloud").value}%`);
 
-  const rows = buildDataset({ lat, lon, trafo, pv, target, vScale: ph.nominal / 400, noiseKw: ph === PHASE[1] ? 5 * trafo / 500 : 5, start: s0, days, cloud: +$("cloud").value / 100, ghi });
+  const hvCsv = document.querySelector('input[name="hvsrc"]:checked').value === "csv";
+  let hv = null;
+  if (hvCsv) {
+    if (!hvData) {
+      log("[!] No HV CSV loaded -> stopped");
+      setStatus("err", "ยังไม่ได้เลือกไฟล์ CSV แรงดันแรงสูง");
+      state.busy = false; $("runBtn").disabled = false; return;
+    }
+    hv = new Float64Array(days * 96);
+    for (let k = 0; k < hv.length; k++) hv[k] = hvData.values[k % hvData.values.length];
+    log(`HV 22 kV           : CSV "${hvData.name}" (${hvData.days} day profile${hvData.days > 1 ? "s" : ""}, cycled)`);
+  } else log("HV 22 kV           : simulated from load and PV");
+  const rows = buildDataset({ lat, lon, trafo, pv, target, hv, vScale: ph.nominal / 400, noiseKw: ph === PHASE[1] ? 5 * trafo / 500 : 5, start: s0, days, cloud: +$("cloud").value / 100, ghi });
   const P = prepare(rows);
   log(`Samples            : ${rows.length}  (train ${P.train.length} / test ${P.test.length})`);
   log("");
@@ -1119,7 +1240,7 @@ async function run(e) {
   const all = P.train.concat(P.test), pred = predTr.concat(predTe);
   const dayList = [];
   for (let i = 0; i + 96 <= all.length; i += 96) dayList.push({ start: i, set: i < P.split ? "train" : "test", r: all[i] });
-  state.model = { all, pred, dayList, split: P.split, history, mTr, mTe, trafo, pv };
+  state.model = { all, pred, dayList, split: P.split, history, mTr, mTe, trafo, pv, hvName: hv ? hvData.name : "" };
   $("kTest").textContent = mTe.rmse.toFixed(2) + " V";
   $("kTestSub").innerHTML = `RMSE · MAE <span class="num">${mTe.mae.toFixed(2)} V</span> · ${P.test.length / 96} วัน`;
   $("kTrain").textContent = mTr.rmse.toFixed(2) + " V";
@@ -1202,6 +1323,7 @@ function renderDay() {
     series: [{ y: sunAt, color: cssVar("--sun"), fill: cssVar("--sun-soft"), width: 1.5, name: "แสงแดด" }] });
   c2.set({ ...base, tipFmt: v => v.toFixed(1) + " V",
     series: [{ y: rows.map(r => r.v22), color: cssVar("--hv"), width: 1.8, name: "22 kV" }] });
+  $("t2sub").textContent = m.hvName ? `นำเข้าจาก ${m.hvName}` : "จำลองโดยระบบ";
   const tapColors = [1, 2, 3, 4, 5].map(i => cssVar("--tap" + i));
   const lim = [{ y: vmin, color: cssVar("--over") }, { y: vmax, color: cssVar("--over") }];
   c3.set({ ...base, hlines: lim, tipFmt: v => v.toFixed(1) + " V",
