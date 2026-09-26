@@ -54,6 +54,10 @@ button,input,select,textarea{font:inherit;color:inherit}
 h1,h2,h3,h4{margin:0;line-height:1.25;text-wrap:balance}
 .mono,.n{font-family:var(--f-mono);font-variant-numeric:tabular-nums}
 [hidden]{display:none!important}
+.th{display:block;font-size:.86em;font-weight:400;color:var(--muted);letter-spacing:0;text-transform:none;line-height:1.35}
+.thi{font-weight:500;color:var(--muted);letter-spacing:0;text-transform:none}
+.sheet .th,.sheet .thi{color:#4a5a62}
+.sheet th .th{font-weight:400}
 
 /* ---------- shell ---------- */
 .app{display:grid;grid-template-columns:248px 1fr;min-height:100%}
@@ -222,6 +226,7 @@ select.st.v-na{background:var(--surface-2)}
 .sheet{width:210mm;min-height:297mm;background:#fff;color:#111;padding:13mm 14mm 14mm;box-shadow:0 2px 14px rgba(0,0,0,.18);font:12px/1.45 var(--f-doc);position:relative}
 .sheet .rh{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;border-bottom:2px solid #1d3a4a;padding-bottom:6px;margin-bottom:8px}
 .sheet .org{font-size:12.5px;font-weight:600;color:#1d3a4a}
+.sheet .rtitle-th{font-size:13px;font-weight:600;color:#1d3a4a}
 .sheet .rtitle{font-size:18px;font-weight:700;letter-spacing:.04em;color:#111;margin-top:2px}
 .sheet .rno{font:10.5px var(--f-mono);color:#555;text-align:right}
 .sheet h3{font-size:13px;font-weight:700;margin:10px 0 4px;letter-spacing:.03em;text-transform:uppercase;color:#1d3a4a}
@@ -230,7 +235,7 @@ select.st.v-na{background:var(--surface-2)}
 .sheet th,.sheet td{border:1px solid #9aa6ad;padding:3px 6px;vertical-align:middle;color:#111;background:#fff}
 .sheet th{background:#E8EEF1;font-weight:700;text-align:center}
 .sheet .info td{border:0;padding:1px 4px}
-.sheet .info td:first-child{width:90px;font-weight:600}
+.sheet .info td:first-child{width:150px;font-weight:600}
 .sheet .kvs{display:grid;grid-template-columns:1fr 1fr;gap:0 18px}
 .sheet .kvs div{display:flex;gap:6px;border-bottom:1px dotted #bbb;padding:2px 0}
 .sheet .kvs span{width:48%;color:#444}
@@ -256,7 +261,8 @@ select.st.v-na{background:var(--surface-2)}
 .sheet .sign{display:grid;grid-template-columns:110px 1fr 1fr;margin-top:12px;break-inside:avoid}
 .sheet .sign div{border:1px solid #9aa6ad;margin:-1px 0 0 -1px;padding:3px 8px;min-height:22px;display:flex;align-items:center;justify-content:center;text-align:center}
 .sheet .sign div.h{background:#E8EEF1;font-weight:700}
-.sheet .sign div.l{justify-content:flex-start;font-weight:600;background:#F4F6F7}
+.sheet .sign div{flex-direction:column}
+.sheet .sign div.l{align-items:flex-start;font-weight:600;background:#F4F6F7}
 .sheet .sign img{max-height:40px;max-width:100%}
 .sheet .sign .sg{min-height:48px}
 .sheet .photos{grid-template-columns:repeat(3,1fr);gap:6px}
@@ -754,6 +760,105 @@ const MOD = {
 };
 const TYPES = Object.keys(MOD).sort((a, b) => MOD[a].code.localeCompare(MOD[b].code));
 
+
+/* ---------- Thai labels (shown next to the English terms) ---------- */
+const TH = {
+  // sections & headings
+  'General inspection': 'การตรวจสอบทั่วไป', 'Visual inspection': 'การตรวจพินิจด้วยสายตา',
+  'Mechanical / electrical operation test': 'การทดสอบการทำงานทางกลและทางไฟฟ้า',
+  'Insulation resistance test': 'การทดสอบความต้านทานฉนวน', 'Contact resistance test': 'การทดสอบความต้านทานหน้าสัมผัส',
+  'Contact timing test': 'การทดสอบเวลาการทำงานของหน้าสัมผัส', 'Trip unit test': 'การทดสอบชุดทริป',
+  'Over voltage (U>)': 'ป้องกันแรงดันเกิน', 'Voltage unbalance (UB)': 'ป้องกันแรงดันไม่สมดุล', 'Under voltage (U<)': 'ป้องกันแรงดันต่ำ',
+  'C/k setting check': 'ตรวจสอบค่าตั้ง C/k', 'Power factor & harmonics': 'ค่าตัวประกอบกำลังและฮาร์มอนิก',
+  'Capacitance measurement': 'การวัดค่าความจุไฟฟ้า', 'Thermographic survey': 'การตรวจจุดร้อนด้วยกล้องอินฟราเรด',
+  'Grounding resistance measurement': 'การวัดค่าความต้านทานดิน', 'Ground system test': 'การทดสอบระบบกราวด์',
+  'Insulation resistance test & capacitance measurement': 'การทดสอบความต้านทานฉนวนและการวัดค่าความจุ',
+  'Relay setting': 'ค่าตั้งรีเลย์', 'Relay setting & test condition': 'ค่าตั้งรีเลย์และเงื่อนไขการทดสอบ',
+  'Long time characteristic': 'คุณลักษณะหน่วงเวลานาน', 'Short time characteristic': 'คุณลักษณะหน่วงเวลาสั้น',
+  'Instantaneous characteristic': 'คุณลักษณะทำงานทันที', 'Earth fault characteristic': 'คุณลักษณะป้องกันกระแสรั่วลงดิน',
+  'Check list': 'รายการตรวจสอบ', 'Technical data': 'ข้อมูลทางเทคนิค', 'Test results': 'ผลการทดสอบ', 'Photos': 'รูปภาพประกอบ',
+  'Comment': 'ความเห็นเพิ่มเติม', 'Recommendation': 'ข้อเสนอแนะ', 'Executive summary': 'สรุปผลสำหรับผู้บริหาร',
+  'Findings & recommendations': 'ข้อบกพร่องและข้อเสนอแนะ', 'Status by test item': 'สถานะตามหัวข้อทดสอบ',
+  // technical data & fields
+  'Manufacturer': 'ผู้ผลิต', 'Type': 'ชนิด / รุ่น', 'Serial no.': 'หมายเลขเครื่อง', 'Year of manufacture': 'ปีที่ผลิต',
+  'Rated voltage': 'แรงดันพิกัด', 'Rated frequency / Pole': 'ความถี่พิกัด / จำนวนขั้ว', 'Rated normal current': 'กระแสพิกัด',
+  'Rated short-circuit breaking current': 'พิกัดตัดกระแสลัดวงจร', 'Rated voltage close coil': 'แรงดันพิกัดคอยล์สั่งปิด',
+  'Rated voltage open coil': 'แรงดันพิกัดคอยล์สั่งเปิด', 'Rated under voltage trip coil': 'แรงดันพิกัดคอยล์ทริปแรงดันต่ำ',
+  'Rated voltage motor charge spring': 'แรงดันพิกัดมอเตอร์อัดสปริง', 'Rated supply voltage of aux. circuit': 'แรงดันพิกัดวงจรช่วย',
+  'Temperature class': 'ระดับอุณหภูมิ', 'Standards': 'มาตรฐาน', 'Standard': 'มาตรฐาน',
+  'Trip unit relay manufacturer': 'ผู้ผลิตชุดทริป', 'Trip unit relay type': 'รุ่นชุดทริป', 'Trip unit relay serial no.': 'หมายเลขชุดทริป',
+  'Model no.': 'รุ่น', 'Rated frequency': 'ความถี่พิกัด', 'Rated voltage (Vn)': 'แรงดันพิกัด', 'Rated current (In)': 'กระแสพิกัด',
+  'Auxiliary voltage': 'แรงดันไฟเลี้ยง', 'Capacitance (rating)': 'พิกัดคาปาซิเตอร์', 'Total rating': 'พิกัดรวม',
+  'Connection': 'การต่อวงจร', 'Number of step': 'จำนวน step', 'Infrared camera': 'กล้องถ่ายภาพความร้อน',
+  'Calibration date': 'วันที่สอบเทียบ', 'Emissivity': 'ค่าการแผ่รังสี', 'Ambient temperature (°C)': 'อุณหภูมิแวดล้อม',
+  'Load during survey (%)': 'โหลดขณะตรวจวัด', 'Systems under test': 'ระบบที่ทดสอบ', 'Electrode type': 'ชนิดหลักดิน',
+  'Soil condition': 'สภาพดิน', 'Weather': 'สภาพอากาศ', 'Test instrument': 'เครื่องมือทดสอบ', 'Amb. temperature': 'อุณหภูมิแวดล้อม',
+  'Humidity': 'ความชื้นสัมพัทธ์', 'Current injection': 'กระแสที่ฉีด', 'Panel no. / Device no.': 'หมายเลขตู้ / อุปกรณ์',
+  'Location': 'สถานที่ติดตั้ง', 'Operating accuracy': 'ความแม่นยำการทำงาน', 'IR test voltage': 'แรงดันทดสอบ IR',
+  'Harmonics (% THD-V)': 'ฮาร์มอนิกแรงดัน', 'Customer': 'ผู้ใช้บริการ', 'Project': 'โครงการ', 'Panel no.': 'หมายเลขตู้',
+  'Test date': 'วันที่ทดสอบ', 'Next PM': 'PM ครั้งถัดไป', 'Contractor': 'ผู้ดำเนินการ',
+  // table headers
+  'Item': 'ข้อ', 'Description': 'รายละเอียด', 'Descriptions': 'รายละเอียด', 'Result': 'ผล', 'Test connection': 'การต่อทดสอบ',
+  'Operation': 'การทำงาน', 'Protective function': 'ฟังก์ชันป้องกัน', 'Type of trip': 'ลักษณะการทริป',
+  'Current threshold': 'ค่ากระแสตั้ง', 'Delay time': 'เวลาหน่วง', 'Current inject': 'กระแสทดสอบ',
+  'Should be (sec)': 'ค่าที่ควรเป็น', 'As found (sec)': 'ค่าที่วัดได้', 'Setting parameter': 'พารามิเตอร์', 'Setting value': 'ค่าตั้ง',
+  'As found pick up': 'ค่าทำงานที่วัดได้', 'As found drop off': 'ค่าคืนตัวที่วัดได้', 'Error': 'ความคลาดเคลื่อน', 'Drop off': 'การคืนตัว',
+  'Injected voltage': 'แรงดันที่ป้อน', 'Time setting (s)': 'เวลาตั้ง', 'As found (s)': 'เวลาที่วัดได้',
+  'Calculated (µF)': 'ค่าคำนวณ', 'Equipment': 'อุปกรณ์', 'Panel': 'ตู้', 'Remark': 'หมายเหตุ', 'No.': 'ลำดับ',
+  'Pass': 'ผ่าน', 'Fail': 'ไม่ผ่าน', 'Investigate': 'ตรวจสอบเพิ่ม', 'N/A': 'ไม่ได้ทดสอบ',
+  'Responsibility': 'หน้าที่', 'Tested by': 'ผู้ทดสอบ', 'Witnessed by': 'ผู้รับรองผล', 'Signature': 'ลายมือชื่อ', 'Name': 'ชื่อ', 'Date': 'วันที่',
+  // inspection items
+  'Name plate data is compliant with drawing and specification.': 'ตรวจสอบข้อมูลบนแผ่นป้ายให้ตรงกับแบบและข้อกำหนด',
+  'Inspection of physical and mechanical damage. (Body, seal, case and cover)': 'ตรวจสอบความเสียหายทางกายภาพและทางกล (ตัวเครื่อง ซีล กล่อง และฝาครอบ)',
+  'On base fixing.': 'ตรวจสอบการยึดติดกับฐาน', 'Wiring and terminal check.': 'ตรวจสอบสายไฟและขั้วต่อ',
+  'Tightness of bolts/screws.': 'ตรวจสอบความแน่นของสลักเกลียว / สกรู', 'Target / LED check.': 'ตรวจสอบไฟแสดงสถานะ / LED',
+  'Verify the unit is clean.': 'ตรวจสอบความสะอาดของอุปกรณ์',
+  'Check for insulating assemblies / body and seal (undamaged) condition': 'ตรวจสภาพฉนวน ตัวเครื่อง และซีล (ไม่ชำรุด)',
+  'Check for main contacts.': 'ตรวจสอบหน้าสัมผัสหลัก', 'Check for moving contact points.': 'ตรวจสอบจุดสัมผัสที่เคลื่อนที่',
+  'Check for surface / painting.': 'ตรวจสอบสภาพผิวและสี', 'Check for moving and sliding parts.': 'ตรวจสอบชิ้นส่วนที่เคลื่อนที่และเลื่อน',
+  'Check for fitted apparatus.': 'ตรวจสอบอุปกรณ์ที่ติดตั้งร่วม', 'Check for terminal and wiring.': 'ตรวจสอบขั้วต่อและสายไฟ',
+  'Check for electrical assemblies.': 'ตรวจสอบชิ้นส่วนทางไฟฟ้า', 'Check for arc chutes.': 'ตรวจสอบห้องดับอาร์ก (arc chute)',
+  'Check for all maintenance devices.': 'ตรวจสอบอุปกรณ์สำหรับบำรุงรักษาทั้งหมด',
+  'Check of withdrawable section operation (Insertion, Racking in, Racking out, Removal)': 'ตรวจการทำงานของส่วนถอดเข้า-ออก (ใส่, rack in, rack out, ถอดออก)',
+  'Check of key and hand crank handle insertion and removal.': 'ตรวจการเสียบและถอดกุญแจและมือหมุน',
+  'Check of withdrawable section interlocking.': 'ตรวจระบบอินเตอร์ล็อกของส่วนถอดเข้า-ออก',
+  'Check of key and hand crank handle charging spring.': 'ตรวจการอัดสปริงด้วยกุญแจและมือหมุน',
+  'Check of operation of switching device.': 'ตรวจการทำงานของอุปกรณ์ตัดต่อ',
+  'Check of switching device interlocking.': 'ตรวจระบบอินเตอร์ล็อกของอุปกรณ์ตัดต่อ',
+  'Check of indicator and auxiliary switch.': 'ตรวจไฟแสดงสถานะและสวิตช์ช่วย',
+  'Verify operation of spring charge at rated voltage.': 'ตรวจการอัดสปริงที่แรงดันพิกัด',
+  'Verify operation (ON-OFF) of switching device at rated voltage.': 'ตรวจการสั่งเปิด-ปิด (ON-OFF) ที่แรงดันพิกัด',
+  'Verify operating cycle of switching device.': 'ตรวจรอบการทำงานของอุปกรณ์ตัดต่อ',
+  'Verify electromagnetic interlocking, if applicable.': 'ตรวจอินเตอร์ล็อกแม่เหล็กไฟฟ้า (ถ้ามี)',
+  'Record as-found operation counter readings.': 'บันทึกค่าตัวนับจำนวนครั้งก่อนบำรุงรักษา',
+  'Record as-left operation counter readings.': 'บันทึกค่าตัวนับจำนวนครั้งหลังบำรุงรักษา',
+  'Visual check for individual capacitor / unit condition.': 'ตรวจสภาพคาปาซิเตอร์แต่ละตัว / แต่ละชุด',
+  'Visual inspection of anchorage, grounding and clearance.': 'ตรวจการยึด การต่อลงดิน และระยะห่าง',
+  'Visual inspection of cable, terminals, connections, racks cabinet.': 'ตรวจสายไฟ ขั้วต่อ จุดต่อ และโครงตู้',
+  'Check for cleanliness of capacitor bank and the panel. (cleaning if required)': 'ตรวจความสะอาดของชุดคาปาซิเตอร์และตู้ (ทำความสะอาดถ้าจำเป็น)',
+  'Check for manual operation.': 'ตรวจการทำงานแบบ Manual', 'Check for automatic operation.': 'ตรวจการทำงานแบบอัตโนมัติ',
+  'Check for display and indicator status.': 'ตรวจจอแสดงผลและไฟแสดงสถานะ',
+  'Ground rod and test well condition.': 'ตรวจสภาพหลักดินและบ่อตรวจ', 'Grounding conductor size and continuity.': 'ตรวจขนาดและความต่อเนื่องของสายดิน',
+  'Clamp / connector tightness and corrosion.': 'ตรวจความแน่นและการกัดกร่อนของแคลมป์ / ขั้วต่อ',
+  'Bonding of enclosure, neutral and PE bar.': 'ตรวจการต่อประสานของตู้ บาร์นิวทรัล และบาร์ PE'
+};
+const bl = en => TH[en] ? `${en} / ${TH[en]}` : en;                                            // plain text
+const b2 = en => TH[en] ? `${esc(en)}<small class="th">${esc(TH[en])}</small>` : esc(en);     // html, Thai on 2nd line
+function thaiize(root) {
+  const key = el => el.textContent.trim().replace(/^\d+(\.\d+)*\.?\s+/, '').replace(/\s*:$/, '');
+  $$('h2,h3,h4,.subh,th,.fld>span:first-child,.kvs>div>span,.sign .h,.sign .l,.info td.k', root).forEach(el => {
+    if (el.dataset.th || el.children.length) return;
+    const t = TH[key(el)]; if (!t) return;
+    el.dataset.th = 1;
+    const block = el.matches('th,.sign .h,.sign .l,.kvs>div>span') || (el.matches('.fld>span') && !el.closest('.sheet'));
+    const colon = /:\s*$/.test(el.textContent);
+    if (colon) el.textContent = el.textContent.replace(/\s*:\s*$/, '');
+    el.insertAdjacentHTML('beforeend', (block ? `<small class="th">${esc(t)}</small>` : `<span class="thi"> / ${esc(t)}</span>`) + (colon ? ':' : ''));
+  });
+  return root;
+}
+function thaiStr(html) { const d = document.createElement('div'); d.innerHTML = html; return thaiize(d).innerHTML; }
+
 /* ---------- recommendations for findings ---------- */
 const RECO = {
   acb: { ir: 'ทำความสะอาด/อบไล่ความชื้น แล้ววัด IR ซ้ำ หากยังต่ำกว่าเกณฑ์ให้ตรวจฉนวนและ arc chute', cr: 'ตรวจสภาพหน้าสัมผัส ทำความสะอาด ขันแน่น และวัดซ้ำ; หากเกินค่าผู้ผลิตให้เปลี่ยน main contact', ct: 'ปรับตั้งกลไก/ตรวจ coil และสปริง ให้เวลาทำงานระหว่างขั้วสอดคล้องกัน', trip: 'ตรวจ trip unit และ setting; เวลาทำงานไม่อยู่ในเกณฑ์ควรส่งซ่อมหรือเปลี่ยน trip unit', gi: 'แก้ไขรายการตรวจพินิจที่ไม่ผ่าน' },
@@ -837,9 +942,9 @@ function findings(r) {
   const m = MOD[r.type], ev = evalRec(r), out = [];
   m.insp.forEach((g, gi) => g.items.forEach((it, ii) => {
     const s = r.insp?.[`${gi}_${ii}`];
-    if (s === 'fail' || s === 'inv') out.push({ r, s, what: `${g.no ? g.no + '.' + (ii + 1) : ii + 1} ${it}`, reco: 'แก้ไขและตรวจซ้ำ' });
+    if (s === 'fail' || s === 'inv') out.push({ r, s, what: `${g.no ? g.no + '.' + (ii + 1) : ii + 1} ${bl(it)}`, reco: 'แก้ไขและตรวจซ้ำ' });
   }));
-  ev.secs.forEach(sc => { if (sc.k !== 'gi' && (sc.s === 'fail' || sc.s === 'inv')) out.push({ r, s: sc.s, what: sc.n, reco: RECO[r.type]?.[sc.k] || '' }); });
+  ev.secs.forEach(sc => { if (sc.k !== 'gi' && (sc.s === 'fail' || sc.s === 'inv')) out.push({ r, s: sc.s, what: bl(sc.n), reco: RECO[r.type]?.[sc.k] || '' }); });
   return out;
 }
 
@@ -879,9 +984,9 @@ function skip(key, lbl) {
 function inspHTML(m) {
   return m.insp.map((g, gi) => `
     <div class="blk">
-      <div class="blk-h"><h3>${g.no ? g.no + '. ' : ''}${esc(g.title)}</h3>${MODE === 'form' ? `<button class="btn sm" data-act="allPass" data-g="${gi}">ทำเครื่องหมาย Pass ทั้งหมด</button>` : ''}</div>
+      <div class="blk-h"><h3>${g.no ? g.no + '. ' : ''}${esc(bl(g.title))}</h3>${MODE === 'form' ? `<button class="btn sm" data-act="allPass" data-g="${gi}">ทำเครื่องหมาย Pass ทั้งหมด</button>` : ''}</div>
       <div class="tw"><table class="tbl"><thead><tr><th>Item</th><th>Description</th><th style="width:130px">Result</th></tr></thead><tbody>
-      ${g.items.map((it, ii) => `<tr><td class="item">${g.no ? g.no + '.' + (ii + 1) : ii + 1}</td><td>${esc(it)}</td><td>${S(`insp.${gi}_${ii}`)}</td></tr>`).join('')}
+      ${g.items.map((it, ii) => `<tr><td class="item">${g.no ? g.no + '.' + (ii + 1) : ii + 1}</td><td>${b2(it)}</td><td>${S(`insp.${gi}_${ii}`)}</td></tr>`).join('')}
       </tbody></table></div>
     </div>`).join('');
 }
@@ -929,6 +1034,7 @@ function render() {
   else if (p === 'report') main.innerHTML = viewReport();
   else if (p === 'calc') { main.innerHTML = viewCalc(); updCalc(); }
   else if (p === 'settings') main.innerHTML = viewSettings();
+  if (p === 'rec' || p === 'list') thaiize(main);
 }
 
 /* ---------- dashboard ---------- */
@@ -1113,7 +1219,7 @@ function viewRec() {
         ${fld('Panel no. / Device no.', 'panel')}${fld('Location', 'location')}${fld('วันที่ทดสอบ', 'date', { type: 'date' })}${fld('กำหนด PM ครั้งถัดไป (ว่าง = อัตโนมัติ)', 'nextDue', { type: 'date' })}
       </div></div></div>
       <div class="card"><div class="hd"><h2>Check list</h2><span class="sub">สรุปอัตโนมัติจากผลทดสอบ</span></div><div class="bd"><div class="chkl">
-        ${ev.secs.map((s, i) => `<div class="row"><span><span class="no">${i + 1}.0</span>${esc(s.n)}</span><span data-sec="${s.k}">${chip(s.s)}</span></div>`).join('')}
+        ${ev.secs.map((s, i) => `<div class="row"><span><span class="no">${i + 1}.0</span>${b2(s.n)}</span><span data-sec="${s.k}">${chip(s.s)}</span></div>`).join('')}
       </div></div></div>
       <div class="card"><div class="hd"><h2>Technical data</h2></div><div class="bd">${techHTML(m)}</div></div>
       ${m.insp.length ? `<div class="card"><div class="hd"><h2>General inspection</h2></div>${inspHTML(m)}</div>` : ''}
@@ -1135,8 +1241,8 @@ function refreshCalc() {
 
 /* ---------- report ---------- */
 let rptScope = 'all';
-function sheetHead(p, title, no) {
-  return `<div class="rh"><div><div class="org">${esc(p.header)}</div><div class="rtitle">${esc(title)}</div></div><div class="rno">${no ? 'Form ' + no + '<br>' : ''}${esc(p.project)}</div></div>`;
+function sheetHead(p, title, no, th) {
+  return `<div class="rh"><div><div class="org">${esc(p.header)}</div><div class="rtitle">${esc(title)}</div>${th ? `<div class="rtitle-th">${esc(th)}</div>` : ''}</div><div class="rno">${no ? 'Form ' + no + '<br>' : ''}${esc(p.project)}</div></div>`;
 }
 function signBlock(p, date) {
   const sig = (img, name) => img ? `<img src="${img}" alt="">` : '';
@@ -1151,18 +1257,18 @@ function recordSheet(r, p, idx, total) {
   MODE = 'report'; R = r; CALC = ev.c;
   const tick = (s, k) => `<td class="tick">${s === k ? '✓' : ''}</td>`;
   const html = `<div class="sheet">
-    ${sheetHead(p, m.name.toUpperCase(), m.code)}
-    <table class="info"><tr><td>Customer</td><td>: ${esc(p.customer)}</td><td style="width:90px;font-weight:600">Test date</td><td>: ${esc(r.date)}</td></tr>
-    <tr><td>Project</td><td>: ${esc(p.project)}</td><td style="font-weight:600">Next PM</td><td>: ${esc(r.nextDue || addMonths(r.date, p.interval))}</td></tr>
-    <tr><td>Location</td><td colspan="3">: ${esc(r.location)}</td></tr><tr><td>Panel no.</td><td colspan="3">: ${esc(r.panel)}</td></tr></table>
+    ${sheetHead(p, m.name.toUpperCase(), m.code, m.th)}
+    <table class="info"><tr><td class="k">Customer</td><td>: ${esc(p.customer)}</td><td class="k" style="width:120px;font-weight:600">Test date</td><td>: ${esc(r.date)}</td></tr>
+    <tr><td class="k">Project</td><td>: ${esc(p.project)}</td><td class="k" style="font-weight:600">Next PM</td><td>: ${esc(r.nextDue || addMonths(r.date, p.interval))}</td></tr>
+    <tr><td class="k">Location</td><td colspan="3">: ${esc(r.location)}</td></tr><tr><td class="k">Panel no.</td><td colspan="3">: ${esc(r.panel)}</td></tr></table>
     <h3>Check list</h3>
     <table><thead><tr><th style="width:44px">Item</th><th>Descriptions</th><th style="width:50px">Pass</th><th style="width:50px">Fail</th><th style="width:74px">Investigate</th><th style="width:50px">N/A</th></tr></thead><tbody>
-    ${ev.secs.map((s, i) => `<tr><td style="text-align:center">${i + 1}.0</td><td>${esc(s.n)}</td>${tick(s.s, 'pass')}${tick(s.s, 'fail')}${tick(s.s, 'inv')}${tick(s.s, 'na')}</tr>`).join('')}
-    <tr><td></td><td style="font-weight:700">ผลสรุปรวม (Overall)</td><td colspan="4" style="text-align:center">${chip(ev.overall)}</td></tr>
+    ${ev.secs.map((s, i) => `<tr><td style="text-align:center">${i + 1}.0</td><td>${b2(s.n)}</td>${tick(s.s, 'pass')}${tick(s.s, 'fail')}${tick(s.s, 'inv')}${tick(s.s, 'na')}</tr>`).join('')}
+    <tr><td></td><td style="font-weight:700">Overall / ผลสรุปรวม</td><td colspan="4" style="text-align:center">${chip(ev.overall)}</td></tr>
     </tbody></table>
     <h3>Technical data</h3>
     <div class="kvs">${m.tech.map(([k, l]) => `<div><span>${esc(l)}</span><b>: ${esc(r.tech?.[k] || '-')}</b></div>`).join('')}</div>
-    ${m.insp.length ? `<h3>General inspection</h3>${m.insp.map((g, gi) => `<table style="margin-top:4px"><thead><tr><th style="width:44px">Item</th><th>${g.no ? g.no + '. ' : ''}${esc(g.title)}</th><th style="width:100px">Result</th></tr></thead><tbody>${g.items.map((it, ii) => `<tr><td style="text-align:center">${g.no ? g.no + '.' + (ii + 1) : ii + 1}</td><td>${esc(it)}</td><td style="text-align:center">${chip(r.insp?.[`${gi}_${ii}`] || '')}</td></tr>`).join('')}</tbody></table>`).join('')}` : ''}
+    ${m.insp.length ? `<h3>General inspection</h3>${m.insp.map((g, gi) => `<table style="margin-top:4px"><thead><tr><th style="width:44px">Item</th><th>${g.no ? g.no + '. ' : ''}${b2(g.title)}</th><th style="width:100px">Result</th></tr></thead><tbody>${g.items.map((it, ii) => `<tr><td style="text-align:center">${g.no ? g.no + '.' + (ii + 1) : ii + 1}</td><td>${b2(it)}</td><td style="text-align:center">${chip(r.insp?.[`${gi}_${ii}`] || '')}</td></tr>`).join('')}</tbody></table>`).join('')}` : ''}
     <h3>Test results</h3>
     ${m.body()}
     ${r.photos?.length ? `<h3>Photos</h3><div class="photos">${r.photos.map(ph => `<div class="ph"><img src="${ph.src}" alt=""><div class="cap">${esc(ph.cap || '')}</div></div>`).join('')}</div>` : ''}
@@ -1179,9 +1285,9 @@ function summarySheets(p, rs) {
   const cnt = s => evs.filter(x => x.e.overall === s).length;
   const fs = rs.flatMap(findings);
   return `<div class="sheet">
-      ${sheetHead(p, 'PREVENTIVE MAINTENANCE REPORT', '')}
+      ${sheetHead(p, 'PREVENTIVE MAINTENANCE REPORT', '', 'รายงานการบำรุงรักษาเชิงป้องกัน')}
       <div class="cover-t">รายงานการบำรุงรักษาเชิงป้องกันระบบไฟฟ้า<br><span style="font-size:20px">Electrical Preventive Maintenance Report</span></div>
-      <table class="info" style="font-size:13px"><tr><td style="width:120px">Customer</td><td>: ${esc(p.customer)}</td></tr><tr><td>Project</td><td>: ${esc(p.project)}</td></tr><tr><td>Location</td><td>: ${esc(p.site)}</td></tr><tr><td>Test date</td><td>: ${esc(p.date)}</td></tr>${p.contractor ? `<tr><td>Contractor</td><td>: ${esc(p.contractor)}</td></tr>` : ''}</table>
+      <table class="info" style="font-size:13px"><tr><td class="k" style="width:190px">Customer</td><td>: ${esc(p.customer)}</td></tr><tr><td class="k">Project</td><td>: ${esc(p.project)}</td></tr><tr><td class="k">Location</td><td>: ${esc(p.site)}</td></tr><tr><td class="k">Test date</td><td>: ${esc(p.date)}</td></tr>${p.contractor ? `<tr><td class="k">Contractor</td><td>: ${esc(p.contractor)}</td></tr>` : ''}</table>
       <h3 style="margin-top:14px">Executive summary</h3>
       <div class="sumk"><div>อุปกรณ์ทั้งหมด<b>${rs.length}</b></div><div>Pass<b>${cnt('pass')}</b></div><div>Investigate<b>${cnt('inv')}</b></div><div>Fail<b>${cnt('fail')}</b></div></div>
       <table><thead><tr><th>No.</th><th>Equipment</th><th>Panel</th><th>Test date</th><th>Result</th><th>Remark</th></tr></thead><tbody>
@@ -1194,7 +1300,8 @@ function summarySheets(p, rs) {
       <div class="foot"><span>${esc(p.customer)}</span><span>Summary</span></div>
     </div>`;
 }
-function buildReport(scope) {
+function buildReport(scope) { return thaiStr(buildReportRaw(scope)); }
+function buildReportRaw(scope) {
   const p = proj();
   if (scope && scope !== 'all' && scope !== 'summary') { const r = DB.records.find(x => x.id === scope); return r ? recordSheet(r, p) : ''; }
   const rs = recs();
@@ -1384,7 +1491,7 @@ document.addEventListener('click', e => {
     case 'export': { const p = proj(); download(`PM_backup_${(p.customer || 'data').replace(/\s+/g, '_')}_${today()}.json`, JSON.stringify(DB, null, 1), 'application/json'); return toast('Export แล้ว'); }
     case 'csv': {
       const rows = [['Code', 'Equipment', 'Panel', 'Location', 'Test date', 'Section', 'Result', 'Overall']];
-      recs().forEach(r2 => { const ev = evalRec(r2); ev.secs.forEach(s => rows.push([MOD[r2.type].code, MOD[r2.type].name, r2.panel, r2.location, r2.date, s.n, ST_LABEL[s.s], ST_LABEL[ev.overall]])); });
+      recs().forEach(r2 => { const ev = evalRec(r2); ev.secs.forEach(s => rows.push([MOD[r2.type].code, MOD[r2.type].name, r2.panel, r2.location, r2.date, bl(s.n), ST_LABEL[s.s], ST_LABEL[ev.overall]])); });
       download(`PM_summary_${today()}.csv`, '﻿' + rows.map(r2 => r2.map(v => `"${String(v ?? '').replace(/"/g, '""')}"`).join(',')).join('\n'), 'text/csv');
       return toast('Export CSV แล้ว');
     }
