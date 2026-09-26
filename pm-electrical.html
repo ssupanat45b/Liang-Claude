@@ -1,0 +1,1443 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>PM Switchboard</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans+Thai:wght@400;500;600;700&family=Sarabun:wght@400;600;700&display=swap">
+<style>
+:root{
+  color-scheme: light;
+  --bg:#EDF1F3; --surface:#FFFFFF; --surface-2:#F5F7F8; --line:#D3DBE0; --line-2:#E4E9EC;
+  --ink:#13222B; --muted:#56686F; --faint:#8696A0;
+  --accent:#AE5620; --accent-hover:#95471A; --accent-ink:#FFFFFF; --accent-soft:#F5E4D8;
+  --nav:#13222B; --nav-ink:#B8C7CF; --nav-active:#FFFFFF; --nav-hi:#1F3340;
+  --good:#0ca30c; --warn:#fab219; --bad:#d03b3b; --na:#A3AFB6; --pend:#D3DBE0;
+  --s1:#2a78d6; --s2:#eb6834; --s3:#1baf7a;
+  --band:rgba(12,163,12,.10);
+  --shadow:0 1px 2px rgba(19,34,43,.06),0 4px 16px rgba(19,34,43,.05);
+  --f-ui:"IBM Plex Sans Thai",Tahoma,"Leelawadee UI","Noto Sans Thai",sans-serif;
+  --f-mono:"IBM Plex Mono",ui-monospace,Consolas,monospace;
+  --f-doc:"Sarabun","TH Sarabun New",Tahoma,sans-serif;
+  --r:8px;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    color-scheme: dark;
+    --bg:#0B1317; --surface:#121D23; --surface-2:#16232A; --line:#27363E; --line-2:#1E2C33;
+    --ink:#E3EBEF; --muted:#90A3AD; --faint:#6B7F89;
+    --accent:#E0894F; --accent-hover:#EC9C66; --accent-ink:#1A0E06; --accent-soft:#3A2416;
+    --nav:#081014; --nav-ink:#91A5AF; --nav-active:#FFFFFF; --nav-hi:#15242C;
+    --pend:#34444D; --na:#6F7F88;
+    --s1:#3987e5; --s2:#d95926; --s3:#199e70;
+    --band:rgba(12,163,12,.16);
+    --shadow:0 1px 2px rgba(0,0,0,.3);
+  }
+}
+:root[data-theme="dark"]{
+  color-scheme: dark;
+  --bg:#0B1317; --surface:#121D23; --surface-2:#16232A; --line:#27363E; --line-2:#1E2C33;
+  --ink:#E3EBEF; --muted:#90A3AD; --faint:#6B7F89;
+  --accent:#E0894F; --accent-hover:#EC9C66; --accent-ink:#1A0E06; --accent-soft:#3A2416;
+  --nav:#081014; --nav-ink:#91A5AF; --nav-active:#FFFFFF; --nav-hi:#15242C;
+  --pend:#34444D; --na:#6F7F88;
+  --s1:#3987e5; --s2:#d95926; --s3:#199e70;
+  --band:rgba(12,163,12,.16);
+  --shadow:0 1px 2px rgba(0,0,0,.3);
+}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%}
+body{background:var(--bg);color:var(--ink);font:14px/1.55 var(--f-ui);-webkit-font-smoothing:antialiased}
+button,input,select,textarea{font:inherit;color:inherit}
+h1,h2,h3,h4{margin:0;line-height:1.25;text-wrap:balance}
+.mono,.n{font-family:var(--f-mono);font-variant-numeric:tabular-nums}
+[hidden]{display:none!important}
+
+/* ---------- shell ---------- */
+.app{display:grid;grid-template-columns:248px 1fr;min-height:100%}
+.side{background:var(--nav);color:var(--nav-ink);padding:18px 12px;position:sticky;top:0;height:100vh;overflow:auto;display:flex;flex-direction:column;gap:14px}
+.brand{display:flex;gap:10px;align-items:center;padding:4px 8px 10px}
+.brand svg{flex:none}
+.brand b{display:block;color:#fff;font-size:15px;letter-spacing:.02em}
+.brand small{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--nav-ink)}
+.projsel{display:grid;gap:4px;padding:0 8px}
+.projsel label{font-size:11px;letter-spacing:.08em;text-transform:uppercase}
+.projsel select{background:var(--nav-hi);border:1px solid #2B4250;color:#fff;border-radius:6px;padding:7px 8px;width:100%}
+.nav{display:grid;gap:2px}
+.nav .grp{font-size:11px;letter-spacing:.09em;text-transform:uppercase;padding:12px 10px 4px;color:#6F8591}
+.nav button{all:unset;cursor:pointer;display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:6px;color:var(--nav-ink)}
+.nav button:hover{background:var(--nav-hi);color:#fff}
+.nav button.on{background:var(--nav-hi);color:var(--nav-active);box-shadow:inset 3px 0 0 var(--accent)}
+.nav button:focus-visible{outline:2px solid var(--accent)}
+.nav .code{font:500 11px var(--f-mono);color:#6F8591;width:20px}
+.nav .cnt{margin-left:auto;font:12px var(--f-mono);color:#6F8591}
+.side-foot{margin-top:auto;font-size:11px;color:#6F8591;padding:0 10px;display:grid;gap:4px}
+.saved{display:flex;align-items:center;gap:6px}
+.saved i{width:7px;height:7px;border-radius:50%;background:var(--good)}
+
+.main{min-width:0;padding:24px clamp(16px,3vw,36px) 60px}
+.top{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:12px;margin-bottom:20px}
+.eyebrow{font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);font-weight:600}
+.top h1{font-size:24px;font-weight:700;margin-top:2px}
+.top .sub{color:var(--muted);font-size:13px}
+.acts{display:flex;flex-wrap:wrap;gap:8px}
+
+.btn{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line);background:var(--surface);color:var(--ink);padding:7px 13px;border-radius:6px;cursor:pointer;font-weight:500;font-size:13px;white-space:nowrap}
+.btn:hover{border-color:var(--muted)}
+.btn:focus-visible,.ipt:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+.btn.pri{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.btn.pri:hover{background:var(--accent-hover)}
+.btn.ghost{background:transparent;border-color:transparent;color:var(--muted)}
+.btn.ghost:hover{color:var(--ink);background:var(--surface-2)}
+.btn.danger{color:var(--bad)}
+.btn.sm{padding:4px 9px;font-size:12px}
+.btn svg{width:15px;height:15px}
+
+.card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);box-shadow:var(--shadow)}
+.card>.hd{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;padding:14px 18px;border-bottom:1px solid var(--line-2)}
+.card>.hd h2,.card>.hd h3{font-size:15px;font-weight:600}
+.card>.bd{padding:16px 18px}
+.stack{display:grid;gap:16px}
+.grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,420px),1fr));gap:16px}
+
+/* KPI */
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px}
+.kpi{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:14px 16px;display:grid;gap:2px}
+.kpi .l{font-size:12px;color:var(--muted);display:flex;align-items:center;gap:6px}
+.kpi .v{font:600 28px/1.1 var(--f-mono);font-variant-numeric:tabular-nums}
+.kpi .v small{font-size:13px;color:var(--muted);font-weight:400}
+.kpi .meter{height:4px;background:var(--line-2);border-radius:2px;margin-top:6px;overflow:hidden}
+.kpi .meter i{display:block;height:100%;background:var(--accent);border-radius:2px}
+
+/* status chip */
+.chip{display:inline-flex;align-items:center;gap:5px;padding:1px 8px 1px 6px;border-radius:999px;font-size:12px;font-weight:600;border:1px solid var(--line);background:var(--surface);white-space:nowrap;line-height:1.6}
+.chip i{width:14px;height:14px;border-radius:50%;display:inline-grid;place-items:center;font-style:normal;font-size:10px;color:#fff;font-weight:700}
+.s-pass i{background:var(--good)} .s-pass i::before{content:"✓"}
+.s-fail i{background:var(--bad)} .s-fail i::before{content:"✕"}
+.s-inv i{background:var(--warn);color:#3a2800} .s-inv i::before{content:"!"}
+.s-na i{background:var(--na)} .s-na i::before{content:"–"}
+.s- i{background:var(--pend)} .s- i::before{content:""}
+.dot{width:9px;height:9px;border-radius:2px;display:inline-block}
+
+/* forms */
+.fgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,210px),1fr));gap:10px 14px}
+.fld{display:grid;gap:3px;font-size:12px;color:var(--muted)}
+.fld.wide{grid-column:1/-1}
+.ipt,.fld input,.fld select,.fld textarea,td input,td select,.inl input{background:var(--surface);border:1px solid var(--line);border-radius:5px;padding:6px 8px;width:100%;color:var(--ink);font-size:13.5px;min-width:0}
+td input,.inl input{padding:4px 6px}
+input.n,td input{font-family:var(--f-mono);font-variant-numeric:tabular-nums}
+.fld textarea{min-height:70px;resize:vertical}
+input:focus,select:focus,textarea:focus{outline:2px solid var(--accent);outline-offset:-1px;border-color:transparent}
+.in{display:flex;align-items:center;gap:4px}
+.in .unit{font-size:12px;color:var(--muted);white-space:nowrap}
+.inl{display:inline-flex;align-items:center;gap:4px;vertical-align:middle}
+.inl input{width:78px}
+select.st{font-weight:600;font-size:12.5px;padding:4px 6px}
+select.st.v-pass{background:color-mix(in srgb,var(--good) 14%,var(--surface))}
+select.st.v-fail{background:color-mix(in srgb,var(--bad) 14%,var(--surface))}
+select.st.v-inv{background:color-mix(in srgb,var(--warn) 22%,var(--surface))}
+select.st.v-na{background:var(--surface-2)}
+.chk{display:inline-flex;align-items:center;gap:6px;font-size:12.5px;color:var(--muted);cursor:pointer}
+.chk input{width:15px;height:15px;accent-color:var(--accent)}
+.note{font-size:12.5px;color:var(--muted);margin:0 0 10px}
+.note b{color:var(--ink);font-weight:600}
+
+/* tables */
+.tw{overflow-x:auto;-webkit-overflow-scrolling:touch}
+.tbl{width:100%;border-collapse:collapse;font-size:13px}
+.tbl th{font-size:11.5px;text-align:left;font-weight:600;color:var(--muted);letter-spacing:.02em;padding:7px 8px;border-bottom:1px solid var(--line);background:var(--surface-2);white-space:nowrap}
+.tbl td{padding:6px 8px;border-bottom:1px solid var(--line-2);vertical-align:middle}
+.tbl tr:last-child td{border-bottom:0}
+.tbl td.c,.tbl th.c{text-align:center}
+.tbl td.r,.tbl th.r{text-align:right}
+.tbl tr.sub td{color:var(--muted);font-size:12px;background:var(--surface-2)}
+.tbl tbody tr.link{cursor:pointer}
+.tbl tbody tr.link:hover td{background:var(--surface-2)}
+.tbl .item{font:12px var(--f-mono);color:var(--muted);width:44px}
+.tbl td .n{white-space:nowrap}
+.blk{display:grid;gap:10px;padding:16px 18px;border-top:1px solid var(--line-2)}
+.blk:first-child{border-top:0}
+.blk-h{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}
+.blk-h h3{font-size:14.5px;font-weight:600}
+.blk-h h4{font-size:13px;font-weight:600}
+.subh{font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);font-weight:600;margin-top:6px}
+
+.chkl{display:grid;gap:6px}
+.chkl .row{display:flex;align-items:center;gap:10px;justify-content:space-between;padding:7px 10px;border-radius:6px;background:var(--surface-2)}
+.chkl .row span:first-child{font-size:13px}
+.chkl .row .no{font:12px var(--f-mono);color:var(--muted);margin-right:8px}
+
+/* list */
+.toolbar{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.toolbar .ipt{max-width:260px}
+.empty{padding:36px 18px;text-align:center;color:var(--muted)}
+.typepick{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px}
+.typepick button{all:unset;cursor:pointer;border:1px solid var(--line);border-radius:var(--r);padding:12px 14px;background:var(--surface);display:grid;gap:2px}
+.typepick button:hover{border-color:var(--accent)}
+.typepick button:focus-visible{outline:2px solid var(--accent)}
+.typepick b{font-size:14px}
+.typepick small{color:var(--muted);font-size:12px}
+.typepick .code{font:12px var(--f-mono);color:var(--accent)}
+
+/* photos */
+.photos{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px}
+.ph{border:1px solid var(--line);border-radius:6px;overflow:hidden;background:var(--surface-2);display:grid}
+.ph img{width:100%;aspect-ratio:4/3;object-fit:cover;display:block}
+.ph .cap{display:flex;gap:4px;padding:4px}
+.ph .cap input{border:0;background:transparent;font-size:12px;padding:3px 4px}
+
+/* charts */
+.chart{width:100%;height:auto;display:block}
+.chart text{fill:var(--muted);font:11px var(--f-ui)}
+.chart .tv{fill:var(--ink);font:500 11px var(--f-mono)}
+.chart .ax{stroke:var(--line);stroke-width:1}
+.chart .grid{stroke:var(--line-2);stroke-width:1}
+.chart .lim{stroke:var(--bad);stroke-width:1.5;stroke-dasharray:5 4}
+.chart .f-pass{fill:var(--good)} .chart .f-fail{fill:var(--bad)} .chart .f-inv{fill:var(--warn)} .chart .f-na{fill:var(--na)} .chart .f-pend{fill:var(--pend)}
+.chart .f1{fill:var(--s1)} .chart .f2{fill:var(--s2)} .chart .f3{fill:var(--s3)}
+.chart .band{fill:var(--band)}
+.chart .hit:hover+*{opacity:.8}
+.chart rect.bar:hover,.chart circle:hover{filter:brightness(1.15)}
+.legend{display:flex;flex-wrap:wrap;gap:12px;font-size:12px;color:var(--muted);margin-top:8px}
+.legend span{display:inline-flex;align-items:center;gap:5px}
+
+/* calc */
+.calcs{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,340px),1fr));gap:16px}
+.out{display:grid;gap:4px;margin-top:12px;padding:10px 12px;background:var(--surface-2);border-radius:6px}
+.out div{display:flex;justify-content:space-between;gap:10px;font-size:13px}
+.out b{font:600 14px var(--f-mono);font-variant-numeric:tabular-nums}
+.formula{font:12px var(--f-mono);color:var(--muted);margin-top:8px}
+
+/* modal & toast */
+.modal{position:fixed;inset:0;background:rgba(8,16,20,.55);display:grid;place-items:center;padding:16px;z-index:50}
+.modal .card{width:min(520px,100%);max-height:90vh;overflow:auto}
+.sigpad{width:100%;height:180px;border:1px dashed var(--line);border-radius:6px;background:#fff;touch-action:none;display:block}
+.toast{position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:9px 16px;border-radius:6px;font-size:13px;z-index:60;box-shadow:var(--shadow);max-width:calc(100% - 32px)}
+.toast.bad{background:var(--bad);color:#fff}
+
+/* ---------- report (paper, always light) ---------- */
+.rpt-wrap{display:grid;gap:18px;justify-items:center;overflow-x:auto;padding-bottom:10px}
+.sheet{width:210mm;min-height:297mm;background:#fff;color:#111;padding:13mm 14mm 14mm;box-shadow:0 2px 14px rgba(0,0,0,.18);font:12px/1.45 var(--f-doc);position:relative}
+.sheet .rh{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;border-bottom:2px solid #1d3a4a;padding-bottom:6px;margin-bottom:8px}
+.sheet .org{font-size:12.5px;font-weight:600;color:#1d3a4a}
+.sheet .rtitle{font-size:18px;font-weight:700;letter-spacing:.04em;color:#111;margin-top:2px}
+.sheet .rno{font:10.5px var(--f-mono);color:#555;text-align:right}
+.sheet h3{font-size:13px;font-weight:700;margin:10px 0 4px;letter-spacing:.03em;text-transform:uppercase;color:#1d3a4a}
+.sheet h4{font-size:12px;font-weight:700;margin:6px 0 3px}
+.sheet table{width:100%;border-collapse:collapse;font-size:11.5px}
+.sheet th,.sheet td{border:1px solid #9aa6ad;padding:3px 6px;vertical-align:middle;color:#111;background:#fff}
+.sheet th{background:#E8EEF1;font-weight:700;text-align:center}
+.sheet .info td{border:0;padding:1px 4px}
+.sheet .info td:first-child{width:90px;font-weight:600}
+.sheet .kvs{display:grid;grid-template-columns:1fr 1fr;gap:0 18px}
+.sheet .kvs div{display:flex;gap:6px;border-bottom:1px dotted #bbb;padding:2px 0}
+.sheet .kvs span{width:48%;color:#444}
+.sheet .kvs b{font-weight:600}
+.sheet .note{color:#444;font-size:11px;margin:2px 0 4px}
+.sheet .note b{color:#111}
+.sheet .chip{border-color:#bbb;background:#fff;color:#111;font-size:10.5px}
+.sheet .chip i{width:12px;height:12px;font-size:9px}
+.sheet .tick{text-align:center;font-weight:700;font-size:13px}
+.sheet .rv{font-family:var(--f-mono);font-size:11px}
+.sheet .blk{padding:0;border:0;gap:4px;margin-top:6px;break-inside:avoid}
+.sheet .blk-h h3{margin:6px 0 0}
+.sheet .fgrid{grid-template-columns:repeat(4,1fr);gap:2px 10px}
+.sheet .fld{font-size:11px;color:#444;display:flex;gap:4px}
+.sheet .fld .rv{color:#111}
+.sheet .tbl th{font-size:10.5px;color:#111;letter-spacing:0;white-space:normal}
+.sheet .tbl td{border-bottom:1px solid #9aa6ad;font-size:11px}
+.sheet .tbl tr.sub td{background:#F4F6F7;color:#333}
+.sheet .tw{overflow:visible}
+.sheet .tbl th,.sheet .tbl td{padding:3px 4px}
+.sheet .tbl .chip{padding:0 5px 0 3px;font-size:10px;gap:3px}
+.sheet .tbl .chip i{width:11px;height:11px;font-size:8px}
+.sheet .sign{display:grid;grid-template-columns:110px 1fr 1fr;margin-top:12px;break-inside:avoid}
+.sheet .sign div{border:1px solid #9aa6ad;margin:-1px 0 0 -1px;padding:3px 8px;min-height:22px;display:flex;align-items:center;justify-content:center;text-align:center}
+.sheet .sign div.h{background:#E8EEF1;font-weight:700}
+.sheet .sign div.l{justify-content:flex-start;font-weight:600;background:#F4F6F7}
+.sheet .sign img{max-height:40px;max-width:100%}
+.sheet .sign .sg{min-height:48px}
+.sheet .photos{grid-template-columns:repeat(3,1fr);gap:6px}
+.sheet .ph{border-color:#bbb;background:#fff}
+.sheet .ph .cap{font-size:10.5px;padding:2px 4px;color:#333}
+.sheet .foot{position:absolute;left:14mm;right:14mm;bottom:6mm;display:flex;justify-content:space-between;font-size:9.5px;color:#777;border-top:1px solid #ddd;padding-top:3px}
+.sheet .cover-t{font-size:28px;font-weight:700;line-height:1.2;margin:30mm 0 6mm;color:#1d3a4a}
+.sheet .cover-s{font-size:15px;color:#333}
+.sheet .sumk{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin:8px 0}
+.sheet .sumk div{border:1px solid #9aa6ad;padding:6px 8px}
+.sheet .sumk b{display:block;font:600 20px var(--f-mono)}
+.sheet .chart text{fill:#444}.sheet .chart .tv{fill:#111}.sheet .chart .ax{stroke:#999}.sheet .chart .grid{stroke:#e5e5e5}
+.sheet .chart .f1{fill:#2a78d6}.sheet .chart .f2{fill:#eb6834}.sheet .chart .f3{fill:#1baf7a}
+.sheet .chart .f-pend{fill:#D3DBE0}.sheet .chart .f-na{fill:#A3AFB6}
+.sheet .legend{color:#444}
+
+#printRoot{display:none}
+@page{size:A4;margin:10mm 0}
+@media print{
+  html,body{background:#fff;height:auto}
+  .app,.toast,.modal{display:none!important}
+  #printRoot{display:block}
+  .sheet{box-shadow:none;margin:0;width:210mm;min-height:0;padding:0 14mm;break-after:page;page-break-after:always}
+  .sheet .foot{position:static;margin-top:10px}
+  .sheet:last-child{break-after:auto;page-break-after:auto}
+  *{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+}
+
+/* ---------- responsive ---------- */
+@media (max-width:900px){
+  .app{grid-template-columns:1fr}
+  .side{position:sticky;top:0;height:auto;z-index:20;padding:10px 16px;gap:8px;flex-direction:column}
+  .brand{padding:0}
+  .brand small{display:none}
+  .projsel{padding:0}
+  .projsel label{display:none}
+  .nav{display:flex;overflow-x:auto;gap:4px;padding-bottom:4px;scrollbar-width:none}
+  .nav .grp,.side-foot{display:none}
+  .nav button{white-space:nowrap;padding:6px 10px;background:var(--nav-hi)}
+  .nav button.on{box-shadow:inset 0 -2px 0 var(--accent)}
+  .nav .cnt{display:none}
+  .main{padding:18px 16px 60px}
+}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+</style>
+</head>
+<body>
+<div class="app">
+  <aside class="side">
+    <div class="brand">
+      <svg width="30" height="30" viewBox="0 0 30 30" aria-hidden="true"><rect x="1" y="1" width="28" height="28" rx="6" fill="#AE5620"/><path d="M16.5 5 9 16.5h5.5L12.8 25 21 12.8h-5.6z" fill="#fff"/></svg>
+      <div><b>PM Switchboard</b><small>Preventive Maintenance</small></div>
+    </div>
+    <div class="projsel">
+      <label for="projSel">โครงการ</label>
+      <select id="projSel"></select>
+    </div>
+    <nav class="nav" id="nav"></nav>
+    <div class="side-foot">
+      <span class="saved"><i></i><span id="savedTxt">บันทึกในเบราว์เซอร์นี้แล้ว</span></span>
+      <span>ข้อมูลเก็บใน localStorage · Export สำรองเป็นประจำ</span>
+    </div>
+  </aside>
+  <main class="main" id="main"></main>
+</div>
+<div id="printRoot"></div>
+<div id="modalRoot"></div>
+
+<script>
+/* =========================================================
+   PM Switchboard — Electrical Preventive Maintenance
+   Single-file app: data entry, calculations, dashboard, PDF
+   ========================================================= */
+const STORE = 'pm-switchboard-v1';
+const $ = (s, el = document) => el.querySelector(s);
+const $$ = (s, el = document) => [...el.querySelectorAll(s)];
+const uid = () => Math.random().toString(36).slice(2, 10);
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const clone = o => JSON.parse(JSON.stringify(o));
+function num(v) {
+  if (v === '' || v == null) return NaN;
+  if (typeof v === 'number') return v;
+  const m = String(v).replace(/,/g, '').match(/-?\d*\.?\d+(e-?\d+)?/i);
+  return m ? parseFloat(m[0]) : NaN;
+}
+function fmt(v, d = 2) {
+  if (v == null || isNaN(v) || !isFinite(v)) return '–';
+  return Number(v).toLocaleString('en-US', { minimumFractionDigits: d, maximumFractionDigits: d });
+}
+function parseIR(v) { // ">550MΩ", "2.5 GΩ", "1200"
+  const s = String(v ?? '').trim();
+  if (!s) return { v: NaN, gt: false };
+  let n = num(s);
+  const unit = s.replace(/[\d.,\s>≥]/g, '');
+  if (/^g/i.test(unit)) n *= 1000;
+  return { v: n, gt: /[>≥]/.test(s) };
+}
+const getP = (o, p) => p.split('.').reduce((a, k) => (a == null ? undefined : a[k]), o);
+function setP(o, p, v) {
+  const ks = p.split('.'); let a = o;
+  for (let i = 0; i < ks.length - 1; i++) {
+    if (a[ks[i]] == null || typeof a[ks[i]] !== 'object') a[ks[i]] = /^\d+$/.test(ks[i + 1]) ? [] : {};
+    a = a[ks[i]];
+  }
+  a[ks.at(-1)] = v;
+}
+function addMonths(d, m) {
+  if (!d) return '';
+  const x = new Date(d + 'T00:00:00'); if (isNaN(x)) return '';
+  x.setMonth(x.getMonth() + (Number(m) || 12));
+  return x.toISOString().slice(0, 10);
+}
+const thDate = d => {
+  if (!d) return '–';
+  const x = new Date(d + 'T00:00:00'); if (isNaN(x)) return d;
+  return x.toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: 'numeric' });
+};
+const today = () => new Date().toISOString().slice(0, 10);
+
+/* ---------- status helpers ---------- */
+const ST_LABEL = { pass: 'Pass', fail: 'Fail', inv: 'Investigate', na: 'N/A', '': 'รอผล' };
+const ST_TH = { pass: 'ผ่าน', fail: 'ไม่ผ่าน', inv: 'ตรวจสอบเพิ่ม', na: 'ไม่ได้ทดสอบ', '': 'รอผล' };
+function worst(arr) {
+  const a = arr.filter(x => x != null);
+  for (const s of ['fail', 'inv', 'pass', 'na']) if (a.includes(s)) return s;
+  return '';
+}
+const chip = (s, label) => `<span class="chip s-${s || ''}"><i></i>${esc(label ?? ST_LABEL[s || ''])}</span>`;
+const within = (v, ref, tol) => Math.abs((v - ref) / ref * 100) <= tol;
+
+/* =========================================================
+   Equipment modules (follow the PEA PM test sheets)
+   ========================================================= */
+const GI_RELAY = [
+  'Name plate data is compliant with drawing and specification.',
+  'Inspection of physical and mechanical damage. (Body, seal, case and cover)',
+  'On base fixing.',
+  'Wiring and terminal check.',
+  'Tightness of bolts/screws.',
+  'Target / LED check.',
+  'Verify the unit is clean.'
+];
+
+const MOD = {
+  acb: {
+    code: '01', name: 'Air Circuit Breaker', short: 'ACB', th: 'เซอร์กิตเบรกเกอร์ชนิดอากาศ',
+    tech: [['mfr', 'Manufacturer'], ['type', 'Type'], ['serial', 'Serial no.'], ['year', 'Year of manufacture'], ['ratedV', 'Rated voltage'], ['freqPole', 'Rated frequency / Pole'], ['In', 'Rated normal current'], ['Icu', 'Rated short-circuit breaking current'], ['closeV', 'Rated voltage close coil'], ['openV', 'Rated voltage open coil'], ['uvtV', 'Rated under voltage trip coil'], ['motorV', 'Rated voltage motor charge spring'], ['auxV', 'Rated supply voltage of aux. circuit'], ['tempClass', 'Temperature class'], ['std', 'Standards'], ['tripMfr', 'Trip unit relay manufacturer'], ['tripType', 'Trip unit relay type'], ['tripSerial', 'Trip unit relay serial no.']],
+    insp: [
+      { title: 'Visual inspection', no: '1', items: ['Check for insulating assemblies / body and seal (undamaged) condition', 'Check for main contacts.', 'Check for moving contact points.', 'Check for surface / painting.', 'Check for moving and sliding parts.', 'Check for fitted apparatus.', 'Check for terminal and wiring.', 'Check for electrical assemblies.', 'Check for arc chutes.', 'Check for all maintenance devices.', 'Verify the unit is clean.'] },
+      { title: 'Mechanical / electrical operation test', no: '2', items: ['Check of withdrawable section operation (Insertion, Racking in, Racking out, Removal)', 'Check of key and hand crank handle insertion and removal.', 'Check of withdrawable section interlocking.', 'Check of key and hand crank handle charging spring.', 'Check of operation of switching device.', 'Check of switching device interlocking.', 'Check of indicator and auxiliary switch.', 'Verify operation of spring charge at rated voltage.', 'Verify operation (ON-OFF) of switching device at rated voltage.', 'Verify operating cycle of switching device.', 'Verify electromagnetic interlocking, if applicable.', 'Record as-found operation counter readings.', 'Record as-left operation counter readings.'] }
+    ],
+    sections: [['gi', 'General inspection'], ['ir', 'Insulation resistance test'], ['cr', 'Contact resistance test'], ['ct', 'Contact timing test'], ['trip', 'Trip unit test']],
+    defaults: () => ({ t: { irV: 1000, irMin: 100, crI: 100, crDev: 50, ctSpread: 5, tol: 20, In: '', IrM: '', trRef: '', trM: 2, IsdM: '', tsd: '', IiM: '', IgM: '', tg: '', instMax: 0.05, lt: [{ m: 2 }, { m: 3 }], st: [{ m: 1.5 }], inst: [{ m: 1.5 }], gf: [{ m: 2 }, { m: 3 }], skip: {} } }),
+    compute(r) {
+      const t = r.t || {}, c = {}, sec = {}, sk = t.skip || {};
+      sec.gi = worst(Object.values(r.insp || {}));
+      // Insulation resistance, temperature corrected to 20 °C (IEEE 43: halves every 10 °C)
+      const min = num(t.irMin) || 100, T = num(t.amb);
+      const k = isNaN(T) ? 1 : Math.pow(2, (T - 20) / 10);
+      c.irK = isNaN(T) ? 'ใส่อุณหภูมิเพื่อแก้ค่า' : `×${fmt(k, 2)}`;
+      const irS = [];
+      [['irClose', 'c'], ['irOpen', 'o']].forEach(([g, p]) => ['A', 'B', 'C'].forEach(ph => {
+        const x = parseIR(t[g]?.[ph]);
+        if (isNaN(x.v)) { c[p + ph] = '–'; return; }
+        const s = x.v >= min ? 'pass' : 'fail'; irS.push(s);
+        c[p + ph] = { t: (x.gt ? '>' : '') + fmt(x.v * k, 0) + ' MΩ', s };
+      }));
+      sec.ir = sk.ir ? 'na' : worst(irS);
+      // Contact resistance
+      const v = ['A', 'B', 'C'].map(p => num(t.cr?.[p])).filter(x => !isNaN(x));
+      if (v.length) {
+        const mn = Math.min(...v), mx = Math.max(...v), avg = v.reduce((a, b) => a + b, 0) / v.length;
+        const dev = (mx - mn) / mn * 100, lim = num(t.crMax), devLim = num(t.crDev) || 50;
+        let s = dev > devLim ? 'inv' : 'pass';
+        if (!isNaN(lim) && mx > lim) s = 'fail';
+        c.crAvg = fmt(avg, 2) + ' µΩ';
+        c.crMaxV = fmt(mx, 2) + ' µΩ';
+        c.crDevV = { t: fmt(dev, 1) + ' %', s: dev > devLim ? 'inv' : 'pass' };
+        c.crLim = isNaN(lim) ? 'ไม่ได้กำหนด' : { t: mx <= lim ? 'ไม่เกินค่าพิกัดผู้ผลิต' : 'เกินค่าพิกัดผู้ผลิต', s: mx <= lim ? 'pass' : 'fail' };
+        sec.cr = sk.cr ? 'na' : s;
+      } else { c.crAvg = c.crMaxV = c.crDevV = c.crLim = '–'; sec.cr = sk.cr ? 'na' : ''; }
+      // Contact timing
+      const ctS = [];
+      [['close', 'Close'], ['open', 'Open']].forEach(([g]) => {
+        const tv = ['A', 'B', 'C'].map(p => num(t.ct?.[g]?.[p])).filter(x => !isNaN(x));
+        if (tv.length) {
+          const spread = Math.max(...tv) - Math.min(...tv), lim = num(t.ctSpread) || 5, mxT = num(t['ct' + g + 'Max']);
+          let s = spread <= lim ? 'pass' : 'inv';
+          if (!isNaN(mxT) && Math.max(...tv) > mxT) s = 'fail';
+          c['ct' + g] = { t: fmt(spread, 1) + ' ms', s }; ctS.push(s);
+        } else c['ct' + g] = '–';
+      });
+      sec.ct = sk.ct ? 'na' : worst(ctS);
+      // Trip unit
+      const In = num(t.In), Ir = In * num(t.IrM), Isd = In * num(t.IsdM), Ii = In * num(t.IiM), Ig = In * num(t.IgM);
+      const tol = num(t.tol) || 20, trRef = num(t.trRef), trM = num(t.trM) || 2;
+      c.Ir = isNaN(Ir) ? '–' : fmt(Ir, 0) + ' A'; c.Isd = isNaN(Isd) ? '–' : fmt(Isd, 0) + ' A';
+      c.Ii = isNaN(Ii) ? '–' : fmt(Ii, 0) + ' A'; c.Ig = isNaN(Ig) ? '–' : fmt(Ig, 0) + ' A';
+      const trS = [];
+      const row = (key, arr, base, shouldFn, maxOnly) => (arr || []).forEach((rw, i) => {
+        const m = num(rw.m), I = base * m, sh = shouldFn(m), f = num(rw.found);
+        c[`${key}${i}I`] = isNaN(I) ? '–' : fmt(I, 0);
+        c[`${key}${i}S`] = isNaN(sh) ? '–' : (maxOnly ? '≤ ' : '') + fmt(sh, 2);
+        if (isNaN(f) || isNaN(sh)) { c[`${key}${i}R`] = '–'; return; }
+        let s;
+        if (maxOnly) { s = f <= sh ? 'pass' : 'fail'; c[`${key}${i}R`] = { t: f <= sh ? 'ภายในเกณฑ์' : 'ช้ากว่าเกณฑ์', s }; }
+        else { const e = (f - sh) / sh * 100; s = Math.abs(e) <= tol ? 'pass' : 'fail'; c[`${key}${i}R`] = { t: (e >= 0 ? '+' : '') + fmt(e, 1) + ' %', s }; }
+        trS.push(s);
+      });
+      row('lt', t.lt, Ir, m => trRef * Math.pow(trM / m, 2));
+      row('st', t.st, Isd, () => num(t.tsd));
+      row('inst', t.inst, Ii, () => num(t.instMax) || 0.05, true);
+      row('gf', t.gf, Ig, () => num(t.tg));
+      sec.trip = sk.trip ? 'na' : worst(trS);
+      return { c, sec };
+    },
+    body() {
+      const ph = ['A', 'B', 'C'];
+      const trRow = (key, lbl, i, sym) => `<tr><td class="n">${F(`t.${key}.${i}.m`, { w: 50, n: 1 })} × ${sym}</td><td class="r">${C(`${key}${i}I`)}</td><td class="r">${C(`${key}${i}S`)}</td><td>${F(`t.${key}.${i}.found`, { n: 1 })}</td><td>${C(`${key}${i}R`)}</td></tr>`;
+      const trTbl = (key, title, sym) => `<div class="tw"><h4 class="subh">${title}</h4><table class="tbl"><thead><tr><th>Current inject</th><th class="r">(A)</th><th class="r">Should be (sec)</th><th>As found (sec)</th><th>ผล</th></tr></thead><tbody>${(getP(R, 't.' + key) || []).map((_, i) => trRow(key, title, i, sym)).join('')}</tbody></table></div>`;
+      return `
+      <div class="blk">
+        <div class="blk-h"><h3>2. Insulation resistance test</h3>${skip('ir')}</div>
+        <p class="note">Power circuit megger ${F('t.irV', { inl: 1, n: 1 })} Vdc for 1 min · ค่าต่ำสุดที่ยอมรับ ${F('t.irMin', { inl: 1, n: 1 })} MΩ · ค่าแก้ไขเป็นที่ 20 °C ตาม IEEE 43 ${C('irK')}</p>
+        <div class="fgrid">${fld('Test instrument', 't.irInst')}${fld('Calibration date', 't.irCal')}${fld('Amb. temperature', 't.amb', { unit: '°C', n: 1 })}${fld('Humidity', 't.hum', { unit: '%', n: 1 })}</div>
+        <div class="tw"><table class="tbl"><thead><tr><th>Test connection</th>${ph.map(p => `<th>Phase ${p} (MΩ)</th>`).join('')}</tr></thead><tbody>
+          <tr><td>1. ACB close — Phase-G (remainder to G)</td>${ph.map(p => `<td>${F('t.irClose.' + p, { n: 1 })}</td>`).join('')}</tr>
+          <tr class="sub"><td>ค่าที่ 20 °C</td>${ph.map(p => `<td>${C('c' + p)}</td>`).join('')}</tr>
+          <tr><td>2. ACB open — Line-Load (1-2)</td>${ph.map(p => `<td>${F('t.irOpen.' + p, { n: 1 })}</td>`).join('')}</tr>
+          <tr class="sub"><td>ค่าที่ 20 °C</td>${ph.map(p => `<td>${C('o' + p)}</td>`).join('')}</tr>
+        </tbody></table></div>
+      </div>
+      <div class="blk">
+        <div class="blk-h"><h3>3. Contact resistance test</h3>${skip('cr')}</div>
+        <p class="note">วัดระหว่าง upper fixed contact ผ่าน ACB ถึง lower contact · ความต่างระหว่างเฟสไม่ควรเกิน ${F('t.crDev', { inl: 1, n: 1 })} % ของค่าต่ำสุด (NETA MTS) · ค่าสูงสุดตามผู้ผลิต ${F('t.crMax', { inl: 1, n: 1, ph: 'µΩ' })} µΩ</p>
+        <div class="fgrid">${fld('Test instrument', 't.crInst')}${fld('Calibration date', 't.crCal')}${fld('Current injection', 't.crI', { unit: 'Adc', n: 1 })}</div>
+        <div class="tw"><table class="tbl"><thead><tr>${ph.map(p => `<th>Ph. ${p} (µΩ)</th>`).join('')}<th>เฉลี่ย</th><th>ค่าสูงสุด</th><th>ความต่าง</th><th>เทียบพิกัด</th></tr></thead><tbody>
+          <tr>${ph.map(p => `<td>${F('t.cr.' + p, { n: 1 })}</td>`).join('')}<td class="n">${C('crAvg')}</td><td class="n">${C('crMaxV')}</td><td>${C('crDevV')}</td><td>${C('crLim')}</td></tr>
+        </tbody></table></div>
+      </div>
+      <div class="blk">
+        <div class="blk-h"><h3>4. Contact timing test</h3>${skip('ct')}</div>
+        <p class="note">ความต่างเวลาระหว่างขั้ว (pole discrepancy) ไม่เกิน ${F('t.ctSpread', { inl: 1, n: 1 })} ms · เวลาปิดสูงสุด ${F('t.ctcloseMax', { inl: 1, n: 1 })} ms · เวลาเปิดสูงสุด ${F('t.ctopenMax', { inl: 1, n: 1 })} ms</p>
+        <div class="tw"><table class="tbl"><thead><tr><th>Operation</th>${ph.map(p => `<th>Pole ${p} (ms)</th>`).join('')}<th>Pole spread</th></tr></thead><tbody>
+          <tr><td>Closing time</td>${ph.map(p => `<td>${F('t.ct.close.' + p, { n: 1 })}</td>`).join('')}<td>${C('ctclose')}</td></tr>
+          <tr><td>Opening time</td>${ph.map(p => `<td>${F('t.ct.open.' + p, { n: 1 })}</td>`).join('')}<td>${C('ctopen')}</td></tr>
+        </tbody></table></div>
+      </div>
+      <div class="blk">
+        <div class="blk-h"><h3>5. Trip unit test</h3>${skip('trip')}</div>
+        <div class="fgrid">${fld('Test instrument', 't.tripInst')}${fld('ความคลาดเคลื่อนเวลาที่ยอมรับ', 't.tol', { unit: '± %', n: 1 })}</div>
+        <div class="tw"><table class="tbl"><thead><tr><th>Protective function</th><th>Type of trip</th><th>Current threshold</th><th>= (A)</th><th>Delay time</th></tr></thead><tbody>
+          <tr><td>Normal current set</td><td>In</td><td>${F('t.In', { n: 1, unit: 'A' })}</td><td class="n">–</td><td>–</td></tr>
+          <tr><td>Overload (L)</td><td>Inverse long time delay</td><td>Ir = ${F('t.IrM', { inl: 1, n: 1 })} × In</td><td class="n">${C('Ir')}</td><td>${F('t.trRef', { inl: 1, n: 1 })} s @ ${F('t.trM', { inl: 1, n: 1 })} × Ir</td></tr>
+          <tr><td>Short-circuit (S)</td><td>Short time delay</td><td>Isd = ${F('t.IsdM', { inl: 1, n: 1 })} × In</td><td class="n">${C('Isd')}</td><td>${F('t.tsd', { inl: 1, n: 1 })} s</td></tr>
+          <tr><td>Short-circuit (I)</td><td>Instantaneous</td><td>Ii = ${F('t.IiM', { inl: 1, n: 1 })} × In</td><td class="n">${C('Ii')}</td><td>≤ ${F('t.instMax', { inl: 1, n: 1 })} s</td></tr>
+          <tr><td>Earth fault (G)</td><td>Short time delay</td><td>Ig = ${F('t.IgM', { inl: 1, n: 1 })} × In</td><td class="n">${C('Ig')}</td><td>${F('t.tg', { inl: 1, n: 1 })} s</td></tr>
+        </tbody></table></div>
+        <p class="note">Long time: t = tr × (k<sub>ref</sub> / k)² (I²t) · Should-be คำนวณอัตโนมัติจาก setting</p>
+        <div class="grid2">${trTbl('lt', 'Long time characteristic', 'Ir')}${trTbl('st', 'Short time characteristic', 'Isd')}${trTbl('inst', 'Instantaneous characteristic', 'Ii')}${trTbl('gf', 'Earth fault characteristic', 'Ig')}</div>
+      </div>`;
+    }
+  },
+
+  vr: {
+    code: '02', name: 'Voltage Relay', short: 'Voltage Relay', th: 'รีเลย์ป้องกันแรงดัน',
+    tech: [['mfr', 'Manufacturer'], ['model', 'Model no.'], ['serial', 'Serial no.'], ['freq', 'Rated frequency'], ['Vn', 'Rated voltage (Vn)'], ['In', 'Rated current (In)'], ['aux', 'Auxiliary voltage']],
+    insp: [{ title: 'General inspection', items: GI_RELAY }],
+    sections: [['gi', 'General inspection'], ['ov', 'Over voltage (U>)'], ['ub', 'Voltage unbalance (UB)'], ['uv', 'Under voltage (U<)']],
+    defaults: () => ({ t: { VnCalc: 400, tol: 5, ov: { on: false }, ub: { on: false }, uv: { on: true } } }),
+    compute(r) {
+      const t = r.t || {}, c = {}, sec = {};
+      sec.gi = worst(Object.values(r.insp || {}));
+      const Vn = num(t.VnCalc) || num(r.tech?.Vn), tol = num(t.tol) || 5;
+      ['ov', 'ub', 'uv'].forEach(f => {
+        const x = t[f] || {}, S = [];
+        if (!x.on) { sec[f] = 'na'; c[f + 'Set'] = c[f + 'PuE'] = c[f + 'DoE'] = c[f + 'TE'] = '–'; c[f + 'Rst'] = '–'; return; }
+        const setV = f === 'ub' ? num(x.pct) : Vn * num(x.pct) / 100, u = f === 'ub' ? ' %' : ' V';
+        c[f + 'Set'] = isNaN(setV) ? '–' : fmt(setV, 1) + u;
+        const pu = num(x.pu);
+        if (!isNaN(pu) && !isNaN(setV)) { const e = (pu - setV) / setV * 100, s = Math.abs(e) <= tol ? 'pass' : 'fail'; c[f + 'PuE'] = { t: (e >= 0 ? '+' : '') + fmt(e, 2) + ' %', s }; S.push(s); } else c[f + 'PuE'] = '–';
+        const dO = num(x.do);
+        if (!isNaN(dO) && !isNaN(pu)) c[f + 'DoE'] = 'Differential ' + fmt(Math.abs(dO - pu) / pu * 100, 2) + ' %'; else c[f + 'DoE'] = '–';
+        const rst = num(x.reset);
+        if (f === 'uv' && !isNaN(rst)) {
+          const rv = Vn * rst / 100; c.uvRst = 'Reset ' + fmt(rv, 1) + ' V';
+          if (!isNaN(dO)) { const e = (dO - rv) / rv * 100, s = Math.abs(e) <= tol ? 'pass' : 'fail'; c.uvDoE = { t: 'Reset ' + (e >= 0 ? '+' : '') + fmt(e, 2) + ' %', s }; S.push(s); }
+        } else if (f === 'uv') c.uvRst = '–';
+        const tf = num(x.tf), ts = num(x.time);
+        if (!isNaN(tf) && !isNaN(ts)) { const e = (tf - ts) / ts * 100, s = Math.abs(e) <= tol ? 'pass' : 'fail'; c[f + 'TE'] = { t: (e >= 0 ? '+' : '') + fmt(e, 2) + ' %', s }; S.push(s); } else c[f + 'TE'] = '–';
+        sec[f] = worst(S);
+      });
+      return { c, sec };
+    },
+    body() {
+      const fn = (f, title, sym, unit) => `
+        <div class="blk">
+          <div class="blk-h"><h3>${title}</h3>${F(`t.${f}.on`, { cb: 'ใช้งานฟังก์ชันนี้' })}</div>
+          <div class="tw"><table class="tbl"><thead><tr><th>Setting ${sym}</th><th>Setting value</th><th>As found pick up</th><th>Error</th><th>As found drop off</th><th>Drop off</th></tr></thead><tbody>
+            <tr><td>${F(`t.${f}.pct`, { n: 1, unit: '%' + (f === 'ub' ? '' : ' Vn') })}</td><td class="n">${C(f + 'Set')}</td><td>${F(`t.${f}.pu`, { n: 1, unit: unit })}</td><td>${C(f + 'PuE')}</td><td>${F(`t.${f}.do`, { n: 1, unit: unit })}</td><td>${C(f + 'DoE')}</td></tr>
+          </tbody></table></div>
+          ${f === 'uv' ? `<p class="note">Automatic reset ที่ ${F('t.uv.reset', { inl: 1, n: 1 })} % ของ Vn → ${C('uvRst')}</p>` : ''}
+          <div class="tw"><table class="tbl"><thead><tr><th>Injected voltage</th><th>Time setting (s)</th><th>As found (s)</th><th>Error</th></tr></thead><tbody>
+            <tr><td>${F(`t.${f}.inj`, { n: 1, unit: unit })}</td><td>${F(`t.${f}.time`, { n: 1 })}</td><td>${F(`t.${f}.tf`, { n: 1 })}</td><td>${C(f + 'TE')}</td></tr>
+          </tbody></table></div>
+        </div>`;
+      return `
+        <div class="blk"><div class="blk-h"><h3>Relay setting & test condition</h3></div>
+          <div class="fgrid">${fld('Vn สำหรับคำนวณ', 't.VnCalc', { unit: 'V', n: 1 })}${fld('Operating accuracy', 't.tol', { unit: '± %', n: 1 })}${fld('Test instrument', 't.inst')}${fld('Calibration date', 't.cal')}${fld('คำอธิบาย setting', 't.settingNote', { wide: 1 })}</div>
+        </div>
+        ${fn('ov', 'Over voltage (U>)', 'U>', 'V')}${fn('ub', 'Voltage unbalance (UB)', 'UB', '%')}${fn('uv', 'Under voltage (U<)', 'U<', 'V')}`;
+    }
+  },
+
+  pfc: {
+    code: '03', name: 'Power Factor Controller', short: 'PF Controller', th: 'ชุดควบคุมค่าตัวประกอบกำลัง',
+    tech: [['mfr', 'Manufacturer'], ['model', 'Model no.'], ['serial', 'Serial no.'], ['freq', 'Rated frequency'], ['Vn', 'Rated voltage (Vn)'], ['In', 'Rated current (In)'], ['aux', 'Auxiliary voltage']],
+    insp: [{ title: 'General inspection', items: GI_RELAY }],
+    sections: [['gi', 'General inspection'], ['ck', 'C/k setting check'], ['pq', 'Power factor & harmonics']],
+    defaults: () => ({ t: { settings: [['Target PF', '0.95'], ['CT ratio', ''], ['End stop', ''], ['Control series', ''], ['Power 1. stage', '']], thdLim: 8, pfTarget: 0.95, U: 400, ctSec: 5 } }),
+    compute(r) {
+      const t = r.t || {}, c = {}, sec = {};
+      sec.gi = worst(Object.values(r.insp || {}));
+      const Q = num(t.stepKvar), U = num(t.U), kk = num(t.ctPri) / num(t.ctSec);
+      const ck = Q * 1000 / (Math.sqrt(3) * U * kk);
+      c.ckCalc = isNaN(ck) ? '–' : fmt(ck, 3) + ' A';
+      const cs = num(t.ckSet);
+      if (!isNaN(ck) && !isNaN(cs)) {
+        const e = (cs - ck) / ck * 100, s = Math.abs(e) <= 10 ? 'pass' : 'inv';
+        c.ckRes = { t: (e >= 0 ? '+' : '') + fmt(e, 1) + ' %', s }; sec.ck = s;
+      } else { c.ckRes = '–'; sec.ck = ''; }
+      const thd = num(t.thd), lim = num(t.thdLim) || 8, S = [];
+      if (!isNaN(thd)) { const s = thd <= lim ? 'pass' : 'fail'; c.thdS = { t: thd <= lim ? `ไม่เกิน ${lim}%` : `เกิน ${lim}%`, s }; S.push(s); } else c.thdS = '–';
+      const pf = num(t.pf), tg = num(t.pfTarget) || 0.95;
+      if (!isNaN(pf)) { const s = pf >= tg ? 'pass' : (pf >= 0.85 ? 'inv' : 'fail'); c.pfS = { t: pf >= tg ? 'ถึงเป้าหมาย' : (pf >= 0.85 ? 'ต่ำกว่าเป้าหมาย' : 'ต่ำกว่า 0.85 (เสี่ยงค่าปรับ kvar)'), s }; S.push(s); } else c.pfS = '–';
+      const P = num(t.P);
+      if (!isNaN(P) && !isNaN(pf) && pf > 0 && pf < 1) {
+        const qc = P * (Math.tan(Math.acos(pf)) - Math.tan(Math.acos(Math.min(tg, 0.9999))));
+        c.qc = qc > 0 ? fmt(qc, 1) + ' kvar' : 'ไม่ต้องเพิ่ม';
+        const inst = num(t.instKvar);
+        c.qcCmp = !isNaN(inst) && qc > 0 ? (inst >= qc ? { t: `ติดตั้ง ${fmt(inst, 0)} kvar เพียงพอ`, s: 'pass' } : { t: `ขาด ${fmt(qc - inst, 1)} kvar`, s: 'inv' }) : '–';
+      } else { c.qc = '–'; c.qcCmp = '–'; }
+      sec.pq = worst(S);
+      return { c, sec };
+    },
+    body() {
+      const rows = getP(R, 't.settings') || [];
+      return `
+        <div class="blk"><div class="blk-h"><h3>Relay setting</h3>${MODE === 'form' ? `<button class="btn sm" data-act="addSet">+ เพิ่มพารามิเตอร์</button>` : ''}</div>
+          <div class="tw"><table class="tbl"><thead><tr><th>Setting parameter</th><th>Setting value</th>${MODE === 'form' ? '<th></th>' : ''}</tr></thead><tbody>
+          ${rows.map((_, i) => `<tr><td>${F(`t.settings.${i}.0`)}</td><td>${F(`t.settings.${i}.1`)}</td>${MODE === 'form' ? `<td class="c"><button class="btn ghost sm" data-act="delSet" data-i="${i}" aria-label="ลบ">✕</button></td>` : ''}</tr>`).join('')}
+          </tbody></table></div>
+        </div>
+        <div class="blk"><div class="blk-h"><h3>ตรวจค่า C/k (response current)</h3></div>
+          <p class="note">C/k = Q<sub>step</sub> / (√3 × U × k) · k = CT ratio · ค่าที่ตั้งควรต่างจากค่าคำนวณไม่เกิน ±10 %</p>
+          <div class="fgrid">${fld('Step ที่เล็กที่สุด', 't.stepKvar', { unit: 'kvar', n: 1 })}${fld('แรงดัน L-L', 't.U', { unit: 'V', n: 1 })}${fld('CT primary', 't.ctPri', { unit: 'A', n: 1 })}${fld('CT secondary', 't.ctSec', { unit: 'A', n: 1 })}${fld('C/k ที่ตั้งไว้ในเครื่อง', 't.ckSet', { unit: 'A', n: 1 })}</div>
+          <div class="tw"><table class="tbl"><thead><tr><th>C/k คำนวณ</th><th>เทียบค่าที่ตั้ง</th></tr></thead><tbody><tr><td class="n">${C('ckCalc')}</td><td>${C('ckRes')}</td></tr></tbody></table></div>
+        </div>
+        <div class="blk"><div class="blk-h"><h3>Power factor & harmonics</h3></div>
+          <p class="note">THD-V ไม่เกิน ${F('t.thdLim', { inl: 1, n: 1 })} % (IEEE 519, ≤ 1 kV) · PF เป้าหมาย ${F('t.pfTarget', { inl: 1, n: 1 })}</p>
+          <div class="fgrid">${fld('Harmonics (% THD-V)', 't.thd', { unit: '%', n: 1 })}${fld('PF ที่วัดได้', 't.pf', { n: 1 })}${fld('โหลด P', 't.P', { unit: 'kW', n: 1 })}${fld('Capacitor ที่ติดตั้ง', 't.instKvar', { unit: 'kvar', n: 1 })}</div>
+          <div class="tw"><table class="tbl"><thead><tr><th>THD-V</th><th>Power factor</th><th>kvar ที่ต้องการ (Qc = P·(tanφ₁ − tanφ₂))</th><th>เทียบกับที่ติดตั้ง</th></tr></thead><tbody><tr><td>${C('thdS')}</td><td>${C('pfS')}</td><td class="n">${C('qc')}</td><td>${C('qcCmp')}</td></tr></tbody></table></div>
+        </div>`;
+    }
+  },
+
+  cap: {
+    code: '04', name: 'Capacitor Bank', short: 'Capacitor Bank', th: 'ชุดคาปาซิเตอร์',
+    tech: [['mfr', 'Manufacturer'], ['type', 'Type'], ['rating', 'Capacitance (rating)'], ['ratedV', 'Rated voltage'], ['total', 'Total rating'], ['conn', 'Connection'], ['steps', 'Number of step'], ['std', 'Standard']],
+    insp: [{ title: 'General inspection', items: ['Name plate data is compliant with drawing and specification.', 'Visual check for individual capacitor / unit condition.', 'Visual inspection of anchorage, grounding and clearance.', 'Visual inspection of cable, terminals, connections, racks cabinet.', 'Check for cleanliness of capacitor bank and the panel. (cleaning if required)', 'Check for manual operation.', 'Check for automatic operation.', 'Check for display and indicator status.'] }],
+    sections: [['gi', 'General inspection'], ['ir', 'Insulation resistance test'], ['cap', 'Capacitance measurement']],
+    defaults: () => ({ t: { q: 50, V: 400, f: 50, conn: 'Delta', irV: 500, irMin: 100, lo: -5, hi: 15, rows: Array.from({ length: 6 }, () => ({})) } }),
+    calcC(t, q) { // µF expected between two line terminals
+      const Q = num(q), V = num(t.V), f = num(t.f) || 50;
+      const Ctot = Q * 1e3 / (2 * Math.PI * f * V * V) * 1e6;
+      return t.conn === 'Star' ? Ctot / 6 : Ctot / 2;
+    },
+    compute(r) {
+      const t = r.t || {}, c = {}, sec = {}, sk = t.skip || {};
+      sec.gi = worst(Object.values(r.insp || {}));
+      const lo = num(t.lo), hi = num(t.hi), min = num(t.irMin) || 100;
+      const irS = [], cS = []; let rated = 0, est = 0;
+      (t.rows || []).forEach((rw, i) => {
+        const q = rw.q !== undefined && rw.q !== '' ? rw.q : t.q, calc = this.calcC(t, q);
+        c[`c${i}`] = isNaN(calc) ? '–' : fmt(calc, 2);
+        const ms = [];
+        ['ab', 'bc', 'ca'].forEach(p => {
+          const m = num(rw[p]);
+          if (isNaN(m) || isNaN(calc)) { c[`e${i}${p}`] = '–'; return; }
+          const e = (m - calc) / calc * 100, s = e >= (isNaN(lo) ? -5 : lo) && e <= (isNaN(hi) ? 15 : hi) ? 'pass' : 'fail';
+          c[`e${i}${p}`] = { t: (e >= 0 ? '+' : '') + fmt(e, 2) + '%', s }; cS.push(s); ms.push(m);
+        });
+        const x = parseIR(rw.ir);
+        if (!isNaN(x.v)) { const s = x.v >= min ? 'pass' : 'fail'; irS.push(s); c[`ir${i}`] = { t: s === 'pass' ? 'Pass' : 'Fail', s }; } else c[`ir${i}`] = '–';
+        if (ms.length && !isNaN(calc)) {
+          const qe = num(q) * (ms.reduce((a, b) => a + b, 0) / ms.length) / calc;
+          c[`q${i}`] = fmt(qe, 1); rated += num(q); est += qe;
+        } else c[`q${i}`] = '–';
+      });
+      c.qRated = rated ? fmt(rated, 0) + ' kvar' : '–';
+      c.qEst = rated ? fmt(est, 1) + ' kvar' : '–';
+      c.qPct = rated ? { t: fmt(est / rated * 100, 1) + ' %', s: est / rated >= 0.95 ? 'pass' : 'inv' } : '–';
+      sec.ir = sk.ir ? 'na' : worst(irS);
+      sec.cap = sk.cap ? 'na' : worst(cS);
+      return { c, sec };
+    },
+    body() {
+      const rows = getP(R, 't.rows') || [];
+      return `
+        <div class="blk">
+          <div class="blk-h"><h3>Insulation resistance test & capacitance measurement</h3><span class="acts">${skip('ir', 'IR')}${skip('cap', 'Cap.')}</span></div>
+          <div class="fgrid">${fld('Test instrument', 't.inst')}${fld('Calibration date', 't.cal')}${fld('kvar ต่อ step (ค่าเริ่มต้น)', 't.q', { unit: 'kvar', n: 1 })}${fld('แรงดันอ้างอิงคำนวณ', 't.V', { unit: 'V', n: 1 })}${fld('ความถี่', 't.f', { unit: 'Hz', n: 1 })}${fld('Connection', 't.conn', { opts: ['Delta', 'Star'] })}${fld('IR test voltage', 't.irV', { unit: 'Vdc', n: 1 })}${fld('IR ต่ำสุดที่ยอมรับ', 't.irMin', { unit: 'MΩ', n: 1 })}</div>
+          <p class="note">C<sub>total</sub> = Q / (2πf·V²) · Delta วัดระหว่างสาย = C<sub>total</sub>/2 · Star = C<sub>total</sub>/6 · เกณฑ์ IEC 60831: Capacitance error ${F('t.lo', { inl: 1, n: 1 })} … +${F('t.hi', { inl: 1, n: 1 })} %</p>
+          <div class="tw"><table class="tbl"><thead><tr><th class="c">Step</th><th>kvar</th><th class="r">Calculated (µF)</th><th>A-B (µF)</th><th>B-C (µF)</th><th>C-A (µF)</th><th>% Error A-B</th><th>B-C</th><th>C-A</th><th>MΩ at test V</th><th>IR</th><th class="r">kvar คงเหลือ</th></tr></thead><tbody>
+          ${rows.map((_, i) => `<tr><td class="c n">${i + 1}</td><td>${F(`t.rows.${i}.q`, { n: 1, ph: String(getP(R, 't.q') ?? '') })}</td><td class="r n">${C('c' + i)}</td>${['ab', 'bc', 'ca'].map(p => `<td>${F(`t.rows.${i}.${p}`, { n: 1 })}</td>`).join('')}${['ab', 'bc', 'ca'].map(p => `<td>${C(`e${i}${p}`)}</td>`).join('')}<td>${F(`t.rows.${i}.ir`, { n: 1 })}</td><td>${C('ir' + i)}</td><td class="r n">${C('q' + i)}</td></tr>`).join('')}
+          <tr class="sub"><td colspan="9">รวม kvar พิกัด ${C('qRated')} · kvar ประเมินจากค่าที่วัด ${C('qEst')}</td><td colspan="3">คงเหลือ ${C('qPct')}</td></tr>
+          </tbody></table></div>
+          ${MODE === 'form' ? `<div class="toolbar"><button class="btn sm" data-act="addStep">+ เพิ่ม step</button><button class="btn sm ghost" data-act="delStep">− ลบ step สุดท้าย</button></div>` : ''}
+        </div>`;
+    }
+  },
+
+  ts: {
+    code: '05', name: 'Thermographic Survey', short: 'Thermoscan', th: 'ตรวจจุดร้อนด้วยกล้องอินฟราเรด',
+    tech: [['camera', 'Infrared camera'], ['cal', 'Calibration date'], ['emis', 'Emissivity'], ['amb', 'Ambient temperature (°C)'], ['load', 'Load during survey (%)']],
+    insp: [],
+    sections: [['scan', 'Thermographic survey']],
+    defaults: () => ({ t: { rows: [{}, {}, {}] } }),
+    sev(dT) {
+      if (isNaN(dT)) return null;
+      if (dT <= 3) return { t: 'ปกติ (ΔT ≤ 3 °C)', s: 'pass' };
+      if (dT <= 15) return { t: 'Probable deficiency · ซ่อมเมื่อมีโอกาส', s: 'inv' };
+      return { t: 'Major · ซ่อมทันที', s: 'fail' };
+    },
+    compute(r) {
+      const t = r.t || {}, c = {}, sec = {}, S = [];
+      (t.rows || []).forEach((rw, i) => {
+        const T = num(rw.temp), ref = num(rw.ref);
+        const dT = T - ref; const sv = this.sev(dT);
+        c[`d${i}`] = isNaN(dT) ? '–' : fmt(dT, 1) + ' °C';
+        c[`s${i}`] = sv || '–'; if (sv) S.push(sv.s);
+      });
+      sec.scan = worst(S);
+      return { c, sec };
+    },
+    body() {
+      const rows = getP(R, 't.rows') || [];
+      return `
+        <div class="blk"><div class="blk-h"><h3>Thermographic survey</h3></div>
+          <p class="note">เกณฑ์ NETA MTS Table 100.18 (เทียบกับอุปกรณ์ชนิดเดียวกันภายใต้โหลดใกล้เคียงกัน): ΔT 1–3 °C อาจผิดปกติ · 4–15 °C น่าจะผิดปกติ · &gt; 15 °C ผิดปกติร้ายแรง</p>
+          <div class="tw"><table class="tbl"><thead><tr><th>ตำแหน่ง / จุดต่อ</th><th>Phase</th><th>Temp. (°C)</th><th>Reference (°C)</th><th class="r">ΔT</th><th>ระดับ</th>${MODE === 'form' ? '<th></th>' : ''}</tr></thead><tbody>
+          ${rows.map((_, i) => `<tr><td>${F(`t.rows.${i}.pos`)}</td><td>${F(`t.rows.${i}.ph`, { opts: ['', 'A', 'B', 'C', 'N', 'G'] })}</td><td>${F(`t.rows.${i}.temp`, { n: 1 })}</td><td>${F(`t.rows.${i}.ref`, { n: 1 })}</td><td class="r n">${C('d' + i)}</td><td>${C('s' + i)}</td>${MODE === 'form' ? `<td class="c"><button class="btn ghost sm" data-act="delRow" data-i="${i}" aria-label="ลบ">✕</button></td>` : ''}</tr>`).join('')}
+          </tbody></table></div>
+          ${MODE === 'form' ? `<div class="toolbar"><button class="btn sm" data-act="addRow">+ เพิ่มจุดตรวจ</button></div>` : ''}
+        </div>`;
+    }
+  },
+
+  gnd: {
+    code: '06', name: 'Grounding Resistance', short: 'Ground System', th: 'ความต้านทานระบบกราวด์',
+    tech: [['sys', 'Systems under test'], ['elec', 'Electrode type'], ['soil', 'Soil condition'], ['weather', 'Weather']],
+    insp: [{ title: 'Visual inspection', items: ['Ground rod and test well condition.', 'Grounding conductor size and continuity.', 'Clamp / connector tightness and corrosion.', 'Bonding of enclosure, neutral and PE bar.'] }],
+    sections: [['gi', 'Visual inspection'], ['res', 'Grounding resistance measurement']],
+    defaults: () => ({ t: { method: 'Fall of potential (61.8 % rule)', lim: 5, mult: 4, pts: [{ name: '' }, { name: 'Distribution Transformer' }] } }),
+    compute(r) {
+      const t = r.t || {}, c = {}, sec = {}, S = [];
+      sec.gi = worst(Object.values(r.insp || {}));
+      const D = num(t.D), X = D * (num(t.mult) || 4);
+      c.X = isNaN(X) ? '–' : fmt(X, 1) + ' m'; c.P = isNaN(X) ? '–' : fmt(X * 0.618, 1) + ' m';
+      const lim = num(t.lim) || 5;
+      (t.pts || []).forEach((p, i) => {
+        const v = num(p.v);
+        if (isNaN(v)) { c['r' + i] = '–'; return; }
+        const s = v <= lim ? 'pass' : 'fail'; S.push(s);
+        c['r' + i] = { t: v <= lim ? `ไม่เกิน ${lim} Ω` : `เกิน ${lim} Ω`, s };
+      });
+      sec.res = worst(S);
+      return { c, sec };
+    },
+    body() {
+      const pts = getP(R, 't.pts') || [];
+      return `
+        <div class="blk"><div class="blk-h"><h3>Ground system test</h3></div>
+          <p class="note">Standard: ${F('t.method', { inl: 1 })} · C2 ห่าง X = ${F('t.mult', { inl: 1, n: 1 })} × D · P2 ห่าง 0.618 × X · เกณฑ์ EIT Standard 2001-56 ไม่เกิน ${F('t.lim', { inl: 1, n: 1 })} Ω</p>
+          <div class="fgrid">${fld('Test instrument', 't.inst')}${fld('Calibration date', 't.cal')}${fld('D: diagonal ของพื้นที่', 't.D', { unit: 'm', n: 1 })}</div>
+          <div class="tw"><table class="tbl"><thead><tr><th>ระยะ C2 (X)</th><th>ระยะ P2 (0.618X)</th></tr></thead><tbody><tr><td class="n">${C('X')}</td><td class="n">${C('P')}</td></tr></tbody></table></div>
+          <h4 class="subh">Grounding resistance measurement</h4>
+          <div class="tw"><table class="tbl"><thead><tr><th class="c">No.</th><th>จุดวัด</th><th>ค่าที่วัดได้ (Ω)</th><th>ผล</th>${MODE === 'form' ? '<th></th>' : ''}</tr></thead><tbody>
+          ${pts.map((_, i) => `<tr><td class="c n">${i + 1}</td><td>${F(`t.pts.${i}.name`)}</td><td>${F(`t.pts.${i}.v`, { n: 1 })}</td><td>${C('r' + i)}</td>${MODE === 'form' ? `<td class="c"><button class="btn ghost sm" data-act="delPt" data-i="${i}" aria-label="ลบ">✕</button></td>` : ''}</tr>`).join('')}
+          </tbody></table></div>
+          ${MODE === 'form' ? `<div class="toolbar"><button class="btn sm" data-act="addPt">+ เพิ่มจุดวัด</button></div>` : ''}
+        </div>`;
+    }
+  }
+};
+const TYPES = Object.keys(MOD).sort((a, b) => MOD[a].code.localeCompare(MOD[b].code));
+
+/* ---------- recommendations for findings ---------- */
+const RECO = {
+  acb: { ir: 'ทำความสะอาด/อบไล่ความชื้น แล้ววัด IR ซ้ำ หากยังต่ำกว่าเกณฑ์ให้ตรวจฉนวนและ arc chute', cr: 'ตรวจสภาพหน้าสัมผัส ทำความสะอาด ขันแน่น และวัดซ้ำ; หากเกินค่าผู้ผลิตให้เปลี่ยน main contact', ct: 'ปรับตั้งกลไก/ตรวจ coil และสปริง ให้เวลาทำงานระหว่างขั้วสอดคล้องกัน', trip: 'ตรวจ trip unit และ setting; เวลาทำงานไม่อยู่ในเกณฑ์ควรส่งซ่อมหรือเปลี่ยน trip unit', gi: 'แก้ไขรายการตรวจพินิจที่ไม่ผ่าน' },
+  vr: { ov: 'ปรับเทียบ/เปลี่ยนรีเลย์ Over voltage', ub: 'ปรับเทียบ/เปลี่ยนรีเลย์ Voltage unbalance', uv: 'ปรับเทียบ/เปลี่ยนรีเลย์ Under voltage', gi: 'แก้ไขรายการตรวจพินิจที่ไม่ผ่าน' },
+  pfc: { ck: 'ตั้งค่า C/k ใหม่ให้ตรงกับขนาด step และ CT ratio', pq: 'ตรวจ step คาปาซิเตอร์ที่เสื่อม/พิจารณาติดตั้งเพิ่ม และวิเคราะห์ฮาร์มอนิก (พิจารณา detuned reactor)', gi: 'แก้ไขรายการตรวจพินิจที่ไม่ผ่าน' },
+  cap: { cap: 'เปลี่ยน capacitor unit ที่ค่า capacitance อยู่นอกเกณฑ์ IEC 60831', ir: 'ตรวจฉนวนและขั้วต่อของ step ที่ IR ต่ำ', gi: 'แก้ไขรายการตรวจพินิจที่ไม่ผ่าน' },
+  ts: { scan: 'ขันแน่น/ทำความสะอาดจุดต่อที่มีอุณหภูมิสูง แล้วสแกนซ้ำหลังแก้ไข' },
+  gnd: { res: 'ปรับปรุงระบบกราวด์ (ตอกหลักดินเพิ่ม/ใช้สารลดความต้านทานดิน) จนค่าไม่เกินเกณฑ์', gi: 'แก้ไขจุดต่อ/ตัวนำกราวด์ที่ชำรุด' }
+};
+
+/* =========================================================
+   Data store
+   ========================================================= */
+let DB;
+function blankProject() {
+  return { id: uid(), customer: '', project: 'PREVENTIVE MAINTENANCE ' + new Date().getFullYear(), site: '', header: 'การไฟฟ้าส่วนภูมิภาค ( PROVINCIAL ELECTRICITY AUTHORITY )', contractor: '', testedBy: '', witnessedBy: '', testedPos: '', witnessedPos: '', sigTested: '', sigWitness: '', date: today(), interval: 12 };
+}
+function newRecord(type, pid) {
+  const p = DB.projects.find(x => x.id === pid);
+  return Object.assign({ id: uid(), projectId: pid, type, panel: '', location: p?.site || '', date: p?.date || today(), tech: {}, insp: {}, comment: '', photos: [], updated: Date.now() }, clone(MOD[type].defaults()));
+}
+function sampleDB() {
+  const p = Object.assign(blankProject(), {
+    customer: 'SUPAMITR GENERAL HOSPITAL', project: 'PREVENTIVE MAINTENANCE 2026', site: 'MDB01 (TR 1,000 kVA , PEA 57-105428)',
+    testedBy: 'MR.KRITSANA CHUEA-SAWAD', witnessedBy: 'MR.SUPANAT CHAMCHUEN', date: '2026-08-23'
+  });
+  DB = { projects: [p], records: [], cur: p.id, calc: {} };
+  const mk = (type, extra) => { const r = newRecord(type, p.id); r.panel = 'MDB01'; deepMerge(r, extra); DB.records.push(r); return r; };
+  const allPass = (n, g = 0) => Object.fromEntries(Array.from({ length: n }, (_, i) => [`${g}_${i}`, 'pass']));
+  mk('acb', {
+    tech: { mfr: 'MITSUBISHI ELECTRIC', type: 'AE1600-SS', serial: 'G92916067H', year: '-', ratedV: '690 VAC', freqPole: '50/60 Hz / 3 pole', In: '1,600 A', Icu: '65 kA', std: 'IEC 947-2' },
+    insp: Object.assign(allPass(11, 0), allPass(13, 1)),
+    t: { irInst: 'FLUKE 1507', irCal: 'N/A', amb: 37, hum: 54, irClose: { A: '>550', B: '>550', C: '>550' }, irOpen: { A: '>550', B: '>550', C: '>550' }, crInst: 'MOSTEC / VG-BAT-200-111', crCal: 'N/A', cr: { A: 30.16, B: 29.46, C: 36.38 }, In: 1600, IrM: 0.8, trRef: 150, trM: 2, IsdM: 10, tsd: 0.5, IiM: 16, skip: { ct: true, trip: true } },
+    comment: 'ACB function test next year'
+  });
+  mk('vr', {
+    tech: { mfr: 'CROMPTON', model: 'PROTECTOR 253-PVEW', serial: '-', freq: '50 Hz', Vn: '400 VAC', In: '-', aux: '230 VAC' },
+    insp: allPass(7),
+    t: { VnCalc: 400, uv: { on: true, pct: 90, time: 5.5, reset: 95 }, settingNote: 'Under-voltage trip occurs at 90% of nominal voltage, with automatic reset when voltage restores to 95%.' }
+  });
+  mk('pfc', {
+    tech: { mfr: 'ABB', model: 'RVC6-1/5A', serial: '334036', freq: '50 Hz', Vn: '100 - 440 VAC', In: '1 A / 5 A', aux: '100 - 440 VAC' },
+    insp: allPass(7),
+    t: { settings: [['WIRING CIRCUIT', 'L1 - N'], ['TARGET PF', '0.95'], ['CT RATIO', '1,600/5 A'], ['END STOP', '6'], ['CONTROL SERIES', '1.1.1.1.1.1'], ['CONTROL PRINCIPLE', 'AUTO / NORMAL'], ['POWER 1.STAGE', '50 kvar'], ['MEASURING VOLTAGE', '230 V (L-N)'], ['V-CONVERTER RATIO', 'NO'], ['CONNECTING TIME', '40 sec'], ['DISCONNECTING TIME', '40 sec'], ['DISCHARGE TIME', '60 sec'], ['ALARM TEMP', '55 °C']], stepKvar: 50, U: 400, ctPri: 1600, ctSec: 5, thd: 7, instKvar: 300 }
+  });
+  const caps = [[535, 536, 535], [531, 530, 528], [438, 500, 497], [532, 532, 559], [499, 438, 497], [507, 444, 506]];
+  mk('cap', {
+    tech: { mfr: 'ABB', type: 'CLMD 63', rating: '50/54 kvar', ratedV: '400/416 V', total: '300 kvar', conn: 'Delta', steps: '6 step', std: 'IEC 60831-1&2' },
+    insp: allPass(8),
+    t: { inst: 'FLUKE 87 V', cal: 'N/A', rows: caps.map(([ab, bc, ca]) => ({ ab, bc, ca, ir: '>550' })) }
+  });
+  mk('gnd', {
+    tech: { sys: 'Ground Rod', elec: 'Ground rod' },
+    t: { pts: [{ name: 'MDB01', v: 3.72 }, { name: 'Distribution Transformer', v: 3.72 }] }
+  });
+  return DB;
+}
+function deepMerge(a, b) { for (const k in b) { if (b[k] && typeof b[k] === 'object' && !Array.isArray(b[k]) && a[k] && typeof a[k] === 'object' && !Array.isArray(a[k])) deepMerge(a[k], b[k]); else a[k] = b[k]; } return a; }
+function loadDB() {
+  try { const s = localStorage.getItem(STORE); if (s) { const d = JSON.parse(s); if (d && d.projects) return d; } } catch (e) { }
+  return sampleDB();
+}
+let saveT;
+function save() {
+  clearTimeout(saveT);
+  $('#savedTxt').textContent = 'กำลังบันทึก…';
+  saveT = setTimeout(() => {
+    try { localStorage.setItem(STORE, JSON.stringify(DB)); $('#savedTxt').textContent = 'บันทึกแล้ว ' + new Date().toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' }); }
+    catch (e) { $('#savedTxt').textContent = 'บันทึกไม่สำเร็จ'; toast('บันทึกไม่สำเร็จ: พื้นที่ของเบราว์เซอร์เต็ม ลองลบรูปภาพบางรูป แล้ว Export สำรองข้อมูล', 'bad'); }
+  }, 350);
+}
+const proj = () => DB.projects.find(p => p.id === DB.cur) || DB.projects[0];
+const recs = () => DB.records.filter(r => r.projectId === proj()?.id);
+function evalRec(r) {
+  const m = MOD[r.type], out = m.compute(r);
+  const secs = m.sections.map(([k, n]) => ({ k, n, s: out.sec[k] ?? '' }));
+  return { c: out.c, secs, overall: worst(secs.map(s => s.s)) };
+}
+const recTitle = r => `${MOD[r.type].short} · ${r.panel || 'ไม่ระบุตู้'}`;
+function findings(r) {
+  const m = MOD[r.type], ev = evalRec(r), out = [];
+  m.insp.forEach((g, gi) => g.items.forEach((it, ii) => {
+    const s = r.insp?.[`${gi}_${ii}`];
+    if (s === 'fail' || s === 'inv') out.push({ r, s, what: `${g.no ? g.no + '.' + (ii + 1) : ii + 1} ${it}`, reco: 'แก้ไขและตรวจซ้ำ' });
+  }));
+  ev.secs.forEach(sc => { if (sc.k !== 'gi' && (sc.s === 'fail' || sc.s === 'inv')) out.push({ r, s: sc.s, what: sc.n, reco: RECO[r.type]?.[sc.k] || '' }); });
+  return out;
+}
+
+/* =========================================================
+   Field renderers (shared by form and report)
+   ========================================================= */
+let MODE = 'form', R = null, CALC = {};
+function F(path, o = {}) {
+  const v = getP(R, path);
+  if (MODE === 'report') {
+    if (o.cb) return v ? `<span class="rv">✓ ${esc(o.cb)}</span>` : `<span class="rv">ไม่ใช้งาน</span>`;
+    const txt = v === undefined || v === '' || v === null ? (o.ph && path.includes('.q') ? o.ph : '–') : v;
+    return `<span class="rv">${esc(txt)}${o.unit && txt !== '–' && !o.inl ? ' ' + esc(o.unit) : ''}</span>`;
+  }
+  if (o.cb) return `<label class="chk"><input type="checkbox" data-k="${path}" ${v ? 'checked' : ''}>${esc(o.cb)}</label>`;
+  if (o.opts) return `<select data-k="${path}">${o.opts.map(x => `<option ${String(x) === String(v ?? '') ? 'selected' : ''}>${esc(x)}</option>`).join('')}</select>`;
+  if (o.area) return `<textarea data-k="${path}" rows="3">${esc(v)}</textarea>`;
+  const ip = `<input data-k="${path}" value="${esc(v ?? '')}" ${o.n ? 'class="n" inputmode="decimal"' : ''} ${o.ph ? `placeholder="${esc(o.ph)}"` : ''} ${o.type ? `type="${o.type}"` : ''} autocomplete="off">`;
+  if (o.inl) return `<span class="inl">${ip}</span>`;
+  return o.unit ? `<span class="in">${ip}<span class="unit">${esc(o.unit)}</span></span>` : ip;
+}
+function fld(label, path, o = {}) {
+  if (MODE === 'report') return `<div class="fld"><span>${esc(label)}:</span>${F(path, o)}</div>`;
+  return `<label class="fld${o.wide ? ' wide' : ''}"><span>${esc(label)}</span>${F(path, o)}</label>`;
+}
+const fmtC = x => x == null ? '–' : typeof x === 'object' ? chip(x.s, x.t) : esc(x);
+const C = key => `<span data-c="${key}">${fmtC(CALC[key])}</span>`;
+function S(path) {
+  const v = getP(R, path) || '';
+  if (MODE === 'report') return chip(v);
+  return `<select class="st v-${v}" data-k="${path}" aria-label="ผลการตรวจ">${[['', '—'], ['pass', 'Pass'], ['fail', 'Fail'], ['inv', 'Investigate'], ['na', 'N/A']].map(([k, l]) => `<option value="${k}" ${k === v ? 'selected' : ''}>${l}</option>`).join('')}</select>`;
+}
+function skip(key, lbl) {
+  if (MODE === 'report') return getP(R, 't.skip.' + key) ? chip('na', 'ไม่ได้ทดสอบ') : '';
+  return F('t.skip.' + key, { cb: `ไม่ได้ทดสอบ${lbl ? ' ' + lbl : ''} (N/A)` });
+}
+function inspHTML(m) {
+  return m.insp.map((g, gi) => `
+    <div class="blk">
+      <div class="blk-h"><h3>${g.no ? g.no + '. ' : ''}${esc(g.title)}</h3>${MODE === 'form' ? `<button class="btn sm" data-act="allPass" data-g="${gi}">ทำเครื่องหมาย Pass ทั้งหมด</button>` : ''}</div>
+      <div class="tw"><table class="tbl"><thead><tr><th>Item</th><th>Description</th><th style="width:130px">Result</th></tr></thead><tbody>
+      ${g.items.map((it, ii) => `<tr><td class="item">${g.no ? g.no + '.' + (ii + 1) : ii + 1}</td><td>${esc(it)}</td><td>${S(`insp.${gi}_${ii}`)}</td></tr>`).join('')}
+      </tbody></table></div>
+    </div>`).join('');
+}
+function techHTML(m) {
+  return `<div class="fgrid">${m.tech.map(([k, l]) => fld(l, 'tech.' + k)).join('')}</div>`;
+}
+
+/* =========================================================
+   Views
+   ========================================================= */
+let VIEW = { page: 'dash' };
+function go(v) { VIEW = v; render(); window.scrollTo(0, 0); }
+const ICON = {
+  pdf: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M4 1.5h5.5L13 5v9.5H4z"/><path d="M9 1.5V5h4"/><path d="M6 9h5M6 11.5h3"/></svg>',
+  plus: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M8 3v10M3 8h10"/></svg>',
+  back: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M10 3 5 8l5 5"/></svg>'
+};
+
+function renderNav() {
+  const ps = $('#projSel');
+  ps.innerHTML = DB.projects.map(p => `<option value="${p.id}" ${p.id === DB.cur ? 'selected' : ''}>${esc(p.customer || 'โครงการใหม่')} — ${esc(p.project)}</option>`).join('') + `<option value="__new">+ สร้างโครงการใหม่</option>`;
+  const rs = recs();
+  const b = (page, label, extra = {}, code = '', cnt = '') => {
+    const on = VIEW.page === page && (extra.type === undefined || VIEW.type === extra.type) && !(page === 'list' && extra.type === undefined && VIEW.type);
+    return `<button class="${on ? 'on' : ''}" data-nav='${JSON.stringify(Object.assign({ page }, extra))}'>${code ? `<span class="code">${code}</span>` : ''}${label}${cnt !== '' ? `<span class="cnt">${cnt}</span>` : ''}</button>`;
+  };
+  $('#nav').innerHTML = `
+    ${b('dash', 'แดชบอร์ด')}
+    ${b('list', 'อุปกรณ์ทั้งหมด', {}, '', rs.length)}
+    <div class="grp">แบบฟอร์มทดสอบ</div>
+    ${TYPES.map(t => b('list', MOD[t].short, { type: t }, MOD[t].code, rs.filter(r => r.type === t).length)).join('')}
+    <div class="grp">เครื่องมือ</div>
+    ${b('report', 'รายงาน / PDF')}
+    ${b('calc', 'เครื่องคำนวณ')}
+    ${b('settings', 'ข้อมูลโครงการ & สำรองข้อมูล')}`;
+}
+
+function render() {
+  renderNav();
+  const main = $('#main');
+  const p = VIEW.page;
+  if (p === 'dash') main.innerHTML = viewDash();
+  else if (p === 'list') main.innerHTML = viewList();
+  else if (p === 'rec') main.innerHTML = viewRec();
+  else if (p === 'report') main.innerHTML = viewReport();
+  else if (p === 'calc') { main.innerHTML = viewCalc(); updCalc(); }
+  else if (p === 'settings') main.innerHTML = viewSettings();
+}
+
+/* ---------- dashboard ---------- */
+function viewDash() {
+  const p = proj(), rs = recs(), evs = rs.map(r => ({ r, e: evalRec(r) }));
+  const cnt = s => evs.filter(x => x.e.overall === s).length;
+  const done = evs.filter(x => x.e.overall !== '').length;
+  const pct = rs.length ? Math.round(done / rs.length * 100) : 0;
+  const allF = rs.flatMap(findings).sort((a, b) => (a.s === 'fail' ? 0 : 1) - (b.s === 'fail' ? 0 : 1));
+  const due = rs.map(r => ({ r, d: r.nextDue || addMonths(r.date, p.interval) })).sort((a, b) => a.d.localeCompare(b.d)).slice(0, 6);
+  const t0 = today();
+  return `
+    <div class="top">
+      <div><div class="eyebrow">${esc(p.project)}</div><h1>${esc(p.customer || 'โครงการใหม่')}</h1><div class="sub">${esc(p.site)} · วันที่ทดสอบ ${thDate(p.date)}</div></div>
+      <div class="acts"><button class="btn" data-nav='{"page":"list"}'>${ICON.plus}เพิ่มอุปกรณ์</button><button class="btn pri" data-nav='{"page":"report"}'>${ICON.pdf}รายงาน PDF</button></div>
+    </div>
+    <div class="stack">
+      <div class="kpis">
+        <div class="kpi"><span class="l">อุปกรณ์ในโครงการ</span><span class="v">${rs.length}</span><div class="meter"><i style="width:${pct}%"></i></div><span class="l">บันทึกผลแล้ว ${pct}%</span></div>
+        <div class="kpi"><span class="l">${chip('pass', 'Pass')}</span><span class="v">${cnt('pass')}</span></div>
+        <div class="kpi"><span class="l">${chip('inv', 'Investigate')}</span><span class="v">${cnt('inv')}</span></div>
+        <div class="kpi"><span class="l">${chip('fail', 'Fail')}</span><span class="v">${cnt('fail')}</span></div>
+        <div class="kpi"><span class="l">ข้อบกพร่องที่พบ</span><span class="v">${allF.length}<small> รายการ</small></span></div>
+      </div>
+      <div class="grid2">
+        <div class="card"><div class="hd"><h2>สถานะผลทดสอบตามหัวข้อ</h2></div><div class="bd">${chartStatus(rs)}</div></div>
+        <div class="card"><div class="hd"><h2>Capacitance error ต่อ step</h2>${capPicker(rs)}</div><div class="bd">${chartCap(rs)}</div></div>
+        <div class="card"><div class="hd"><h2>Grounding resistance</h2></div><div class="bd">${chartGnd(rs)}</div></div>
+        <div class="card"><div class="hd"><h2>ACB contact resistance</h2></div><div class="bd">${chartCR(rs)}</div></div>
+      </div>
+      <div class="card"><div class="hd"><h2>ข้อบกพร่องและข้อเสนอแนะ</h2><span class="sub">${allF.length} รายการ</span></div>
+        ${allF.length ? `<div class="tw"><table class="tbl"><thead><tr><th>ผล</th><th>อุปกรณ์</th><th>หัวข้อ</th><th>ข้อเสนอแนะ</th></tr></thead><tbody>
+        ${allF.map(f => `<tr class="link" data-open="${f.r.id}"><td>${chip(f.s)}</td><td>${esc(recTitle(f.r))}</td><td>${esc(f.what)}</td><td>${esc(f.reco)}</td></tr>`).join('')}
+        </tbody></table></div>` : `<div class="empty">ยังไม่พบข้อบกพร่อง</div>`}
+      </div>
+      <div class="grid2">
+        <div class="card"><div class="hd"><h2>สรุปรายอุปกรณ์</h2></div>
+          ${rs.length ? `<div class="tw"><table class="tbl"><thead><tr><th>No.</th><th>อุปกรณ์</th><th>ตู้</th><th>ผลรวม</th></tr></thead><tbody>
+          ${evs.map((x, i) => `<tr class="link" data-open="${x.r.id}"><td class="n">${MOD[x.r.type].code}</td><td>${esc(MOD[x.r.type].name)}</td><td>${esc(x.r.panel || '–')}</td><td>${chip(x.e.overall)}</td></tr>`).join('')}
+          </tbody></table></div>` : `<div class="empty">ยังไม่มีอุปกรณ์ในโครงการนี้</div>`}
+        </div>
+        <div class="card"><div class="hd"><h2>กำหนด PM ครั้งถัดไป</h2><span class="sub">ทุก ${p.interval} เดือน</span></div>
+          ${due.length ? `<div class="tw"><table class="tbl"><thead><tr><th>อุปกรณ์</th><th>ครบกำหนด</th><th>สถานะ</th></tr></thead><tbody>
+          ${due.map(x => { const days = Math.round((new Date(x.d) - new Date(t0)) / 864e5); return `<tr class="link" data-open="${x.r.id}"><td>${esc(recTitle(x.r))}</td><td class="n">${thDate(x.d)}</td><td>${days < 0 ? chip('fail', 'เลยกำหนด ' + (-days) + ' วัน') : days <= 30 ? chip('inv', 'อีก ' + days + ' วัน') : `<span class="sub">อีก ${days} วัน</span>`}</td></tr>`; }).join('')}
+          </tbody></table></div>` : `<div class="empty">–</div>`}
+        </div>
+      </div>
+    </div>`;
+}
+
+/* ---------- charts (inline SVG) ---------- */
+const SV = (w, h, inner, label) => `<svg class="chart" viewBox="0 0 ${w} ${h}" role="img" aria-label="${esc(label)}">${inner}</svg>`;
+function niceMax(v) { const p = Math.pow(10, Math.floor(Math.log10(v || 1))); for (const m of [1, 2, 2.5, 5, 10]) if (m * p >= v) return m * p; return 10 * p; }
+function chartStatus(rs) {
+  const rows = [];
+  rs.forEach(r => { const e = evalRec(r); e.secs.forEach(s => rows.push({ t: r.type, s: s.s })); });
+  const data = TYPES.map(t => { const a = rows.filter(x => x.t === t); return { t, n: a.length, pass: a.filter(x => x.s === 'pass').length, inv: a.filter(x => x.s === 'inv').length, fail: a.filter(x => x.s === 'fail').length, na: a.filter(x => x.s === 'na').length, pend: a.filter(x => x.s === '').length }; }).filter(d => d.n);
+  if (!data.length) return '<div class="empty">ยังไม่มีข้อมูล</div>';
+  const W = 560, L = 110, RR = 30, rh = 30, H = data.length * rh + 26;
+  const mx = Math.max(...data.map(d => d.n)), sc = (W - L - RR) / mx;
+  let g = '';
+  for (let i = 0; i <= mx; i++) { const x = L + i * sc; g += `<line class="grid" x1="${x}" x2="${x}" y1="4" y2="${H - 22}"/><text x="${x}" y="${H - 8}" text-anchor="middle">${i}</text>`; }
+  data.forEach((d, i) => {
+    const y = 8 + i * rh; let x = L;
+    g += `<text x="${L - 8}" y="${y + 14}" text-anchor="end">${esc(MOD[d.t].short)}</text>`;
+    ['pass', 'inv', 'fail', 'na', 'pend'].forEach(k => {
+      if (!d[k]) return; const w = d[k] * sc;
+      g += `<rect class="bar f-${k}" x="${x}" y="${y}" width="${Math.max(w - 2, 1)}" height="18" rx="3"><title>${MOD[d.t].short}: ${ST_LABEL[k === 'pend' ? '' : k]} ${d[k]} หัวข้อ</title></rect>`;
+      if (w > 18) g += `<text class="tv" x="${x + w / 2 - 1}" y="${y + 13}" text-anchor="middle" style="fill:${k === 'inv' || k === 'pend' ? '#2a1d00' : '#fff'}">${d[k]}</text>`;
+      x += w;
+    });
+  });
+  return SV(W, H, g, 'สถานะผลทดสอบตามหัวข้อ') + `<div class="legend">${[['pass', 'Pass'], ['inv', 'Investigate'], ['fail', 'Fail'], ['na', 'N/A'], ['pend', 'รอผล']].map(([k, l]) => `<span><i class="dot" style="background:var(--${k === 'pass' ? 'good' : k === 'inv' ? 'warn' : k === 'fail' ? 'bad' : k === 'na' ? 'na' : 'pend'})"></i>${l}</span>`).join('')}</div>`;
+}
+let capSel = null;
+function capPicker(rs) {
+  const cs = rs.filter(r => r.type === 'cap');
+  if (cs.length < 2) return '';
+  return `<select id="capSel" class="ipt" style="width:auto">${cs.map(r => `<option value="${r.id}" ${r.id === capSel ? 'selected' : ''}>${esc(r.panel || 'ไม่ระบุตู้')}</option>`).join('')}</select>`;
+}
+function chartCap(rs) {
+  const cs = rs.filter(r => r.type === 'cap');
+  const r = cs.find(x => x.id === capSel) || cs[0];
+  if (!r) return '<div class="empty">ยังไม่มีข้อมูล Capacitor Bank</div>';
+  const t = r.t, pts = [];
+  (t.rows || []).forEach((rw, i) => {
+    const calc = MOD.cap.calcC(t, rw.q !== undefined && rw.q !== '' ? rw.q : t.q);
+    ['ab', 'bc', 'ca'].forEach((p, j) => { const m = num(rw[p]); if (!isNaN(m) && !isNaN(calc)) pts.push({ i, j, e: (m - calc) / calc * 100, m }); });
+  });
+  if (!pts.length) return '<div class="empty">ยังไม่มีค่าที่วัด</div>';
+  const lo = num(t.lo) || -5, hi = num(t.hi) || 15;
+  const ymin = Math.min(-20, Math.floor(Math.min(...pts.map(p => p.e)) / 5) * 5), ymax = Math.max(20, Math.ceil(Math.max(...pts.map(p => p.e)) / 5) * 5);
+  const W = 560, H = 230, L = 44, RR = 12, T = 10, B = 30, n = t.rows.length;
+  const y = v => T + (ymax - v) / (ymax - ymin) * (H - T - B), bw = (W - L - RR) / n;
+  let g = `<rect class="band" x="${L}" y="${y(hi)}" width="${W - L - RR}" height="${y(lo) - y(hi)}"/>`;
+  for (let v = ymin; v <= ymax; v += 5) g += `<line class="${v === 0 ? 'ax' : 'grid'}" x1="${L}" x2="${W - RR}" y1="${y(v)}" y2="${y(v)}"/>${v % 10 === 0 ? `<text x="${L - 6}" y="${y(v) + 4}" text-anchor="end">${v > 0 ? '+' : ''}${v}%</text>` : ''}`;
+  g += `<text x="${W - RR - 4}" y="${y(hi) - 4}" text-anchor="end">เกณฑ์ IEC 60831 ${lo}…+${hi}%</text>`;
+  for (let i = 0; i < n; i++) g += `<text x="${L + bw * (i + .5)}" y="${H - 10}" text-anchor="middle">Step ${i + 1}</text>`;
+  const ph = ['A-B', 'B-C', 'C-A'];
+  pts.forEach(p => {
+    const cx = L + bw * (p.i + .5) + (p.j - 1) * Math.min(14, bw / 4), out = p.e < lo || p.e > hi;
+    g += `<circle cx="${cx}" cy="${y(p.e)}" r="${out ? 6 : 5}" class="f${p.j + 1}" stroke="${out ? 'var(--bad)' : 'var(--surface)'}" stroke-width="2"><title>Step ${p.i + 1} ${ph[p.j]}: ${fmt(p.m, 0)} µF (${p.e >= 0 ? '+' : ''}${fmt(p.e, 2)}%)${out ? ' — นอกเกณฑ์' : ''}</title></circle>`;
+  });
+  return SV(W, H, g, 'Capacitance error') + `<div class="legend"><span><i class="dot" style="background:var(--s1)"></i>A-B</span><span><i class="dot" style="background:var(--s2)"></i>B-C</span><span><i class="dot" style="background:var(--s3)"></i>C-A</span><span><i class="dot" style="background:var(--band);border:1px solid var(--good)"></i>ช่วงที่ยอมรับ</span><span>ขอบแดง = นอกเกณฑ์ · ${esc(r.panel)}</span></div>`;
+}
+function chartGnd(rs) {
+  const pts = [];
+  rs.filter(r => r.type === 'gnd').forEach(r => (r.t.pts || []).forEach(p => { const v = num(p.v); if (!isNaN(v)) pts.push({ n: p.name || r.panel, v, lim: num(r.t.lim) || 5 }); }));
+  if (!pts.length) return '<div class="empty">ยังไม่มีข้อมูลกราวด์</div>';
+  const lim = pts[0].lim, W = 560, H = 220, L = 40, RR = 12, T = 12, B = 34;
+  const ymax = niceMax(Math.max(lim * 1.4, ...pts.map(p => p.v * 1.1)));
+  const y = v => T + (1 - v / ymax) * (H - T - B), bw = (W - L - RR) / pts.length, w = Math.min(56, bw * .55);
+  let g = '';
+  for (let i = 0; i <= 4; i++) { const v = ymax * i / 4; g += `<line class="${i ? 'grid' : 'ax'}" x1="${L}" x2="${W - RR}" y1="${y(v)}" y2="${y(v)}"/><text x="${L - 6}" y="${y(v) + 4}" text-anchor="end">${fmt(v, v % 1 ? 1 : 0)}</text>`; }
+  pts.forEach((p, i) => {
+    const cx = L + bw * (i + .5), over = p.v > lim;
+    g += `<rect class="bar ${over ? 'f-fail' : 'f1'}" x="${cx - w / 2}" y="${y(p.v)}" width="${w}" height="${y(0) - y(p.v)}" rx="4"><title>${esc(p.n)}: ${fmt(p.v, 2)} Ω</title></rect>`;
+    g += `<rect x="${cx - w / 2}" y="${y(0) - 4}" width="${w}" height="4" class="${over ? 'f-fail' : 'f1'}"/>`;
+    g += `<text class="tv" x="${cx}" y="${y(p.v) - 5}" text-anchor="middle">${fmt(p.v, 2)}</text>`;
+    const nm = p.n.length > 16 ? p.n.slice(0, 15) + '…' : p.n;
+    g += `<text x="${cx}" y="${H - 14}" text-anchor="middle">${esc(nm)}</text>`;
+  });
+  g += `<line class="lim" x1="${L}" x2="${W - RR}" y1="${y(lim)}" y2="${y(lim)}"/><text x="${W - RR - 2}" y="${y(lim) - 5}" text-anchor="end">เกณฑ์ ≤ ${lim} Ω (EIT 2001-56)</text>`;
+  return SV(W, H, g, 'Grounding resistance') + `<div class="legend"><span>หน่วย Ω · เส้นประ = ค่าสูงสุดที่ยอมรับ</span></div>`;
+}
+function chartCR(rs) {
+  const d = rs.filter(r => r.type === 'acb').map(r => ({ n: r.panel || '–', v: ['A', 'B', 'C'].map(p => num(r.t?.cr?.[p])) })).filter(x => x.v.some(v => !isNaN(v)));
+  if (!d.length) return '<div class="empty">ยังไม่มีข้อมูล ACB</div>';
+  const W = 560, H = 220, L = 40, RR = 12, T = 14, B = 30;
+  const ymax = niceMax(Math.max(...d.flatMap(x => x.v.filter(v => !isNaN(v)))) * 1.15);
+  const y = v => T + (1 - v / ymax) * (H - T - B), gw = (W - L - RR) / d.length, bw = Math.min(30, gw / 4.5);
+  let g = '';
+  for (let i = 0; i <= 5; i++) { const v = ymax * i / 5; g += `<line class="${i ? 'grid' : 'ax'}" x1="${L}" x2="${W - RR}" y1="${y(v)}" y2="${y(v)}"/><text x="${L - 6}" y="${y(v) + 4}" text-anchor="end">${fmt(v, 0)}</text>`; }
+  d.forEach((x, i) => {
+    const c0 = L + gw * (i + .5);
+    x.v.forEach((v, j) => {
+      if (isNaN(v)) return; const bx = c0 + (j - 1.5) * (bw + 2);
+      g += `<rect class="bar f${j + 1}" x="${bx}" y="${y(v)}" width="${bw}" height="${y(0) - y(v)}" rx="4"><title>${esc(x.n)} Ph.${'ABC'[j]}: ${fmt(v, 2)} µΩ</title></rect><rect class="f${j + 1}" x="${bx}" y="${y(0) - 4}" width="${bw}" height="4"/>`;
+      g += `<text class="tv" x="${bx + bw / 2}" y="${y(v) - 4}" text-anchor="middle">${fmt(v, 1)}</text>`;
+    });
+    g += `<text x="${c0}" y="${H - 10}" text-anchor="middle">${esc(x.n)}</text>`;
+  });
+  return SV(W, H, g, 'ACB contact resistance') + `<div class="legend"><span><i class="dot" style="background:var(--s1)"></i>Phase A</span><span><i class="dot" style="background:var(--s2)"></i>Phase B</span><span><i class="dot" style="background:var(--s3)"></i>Phase C</span><span>หน่วย µΩ</span></div>`;
+}
+
+/* ---------- equipment list ---------- */
+let listQ = '';
+function viewList() {
+  const type = VIEW.type, rs = recs().filter(r => !type || r.type === type)
+    .filter(r => !listQ || (recTitle(r) + ' ' + r.location + ' ' + JSON.stringify(r.tech)).toLowerCase().includes(listQ.toLowerCase()));
+  const m = type && MOD[type];
+  return `
+    <div class="top">
+      <div><div class="eyebrow">${m ? 'แบบฟอร์ม ' + m.code : 'อุปกรณ์ทั้งหมด'}</div><h1>${m ? esc(m.name) : 'รายการอุปกรณ์'}</h1><div class="sub">${m ? esc(m.th) : 'เลือกอุปกรณ์เพื่อบันทึกผล หรือเพิ่มอุปกรณ์ใหม่'}</div></div>
+      <div class="acts">${m ? `<button class="btn pri" data-new="${type}">${ICON.plus}เพิ่ม ${esc(m.short)}</button>` : ''}</div>
+    </div>
+    <div class="stack">
+      ${!m ? `<div class="card"><div class="hd"><h2>เพิ่มอุปกรณ์ใหม่</h2></div><div class="bd"><div class="typepick">${TYPES.map(t => `<button data-new="${t}"><span class="code">${MOD[t].code}</span><b>${esc(MOD[t].name)}</b><small>${esc(MOD[t].th)}</small></button>`).join('')}</div></div></div>` : ''}
+      <div class="card">
+        <div class="hd"><h2>${rs.length} รายการ</h2><div class="toolbar"><input class="ipt" id="listQ" placeholder="ค้นหาตู้, ยี่ห้อ, รุ่น…" value="${esc(listQ)}"></div></div>
+        ${rs.length ? `<div class="tw"><table class="tbl"><thead><tr><th>No.</th><th>อุปกรณ์</th><th>ตู้ / Panel</th><th>ตำแหน่ง</th><th>วันที่ทดสอบ</th><th>ผลรวม</th><th></th></tr></thead><tbody>
+        ${rs.map(r => { const e = evalRec(r); return `<tr class="link" data-open="${r.id}"><td class="n">${MOD[r.type].code}</td><td>${esc(MOD[r.type].name)}<div class="sub">${esc([r.tech.mfr, r.tech.type || r.tech.model].filter(Boolean).join(' · '))}</div></td><td><b>${esc(r.panel || '–')}</b></td><td>${esc(r.location)}</td><td class="n">${thDate(r.date)}</td><td>${chip(e.overall)}</td><td class="r"><button class="btn sm" data-pdf="${r.id}">${ICON.pdf}PDF</button></td></tr>`; }).join('')}
+        </tbody></table></div>` : `<div class="empty">ยังไม่มีรายการ${m ? ' — กด “เพิ่ม ' + esc(m.short) + '” เพื่อเริ่มบันทึก' : ''}</div>`}
+      </div>
+    </div>`;
+}
+
+/* ---------- record form ---------- */
+function viewRec() {
+  const r = DB.records.find(x => x.id === VIEW.id);
+  if (!r) { VIEW = { page: 'list' }; return viewList(); }
+  const m = MOD[r.type], ev = evalRec(r);
+  MODE = 'form'; R = r; CALC = ev.c;
+  return `
+    <div class="top">
+      <div><button class="btn ghost sm" data-nav='${JSON.stringify({ page: 'list', type: r.type })}'>${ICON.back}${esc(m.name)}</button>
+        <h1>${esc(m.name)} · <span id="recPanel">${esc(r.panel || 'ไม่ระบุตู้')}</span></h1><div class="sub">แบบฟอร์ม ${m.code} · ${esc(m.th)} · ผลรวม <span id="overall">${chip(ev.overall)}</span></div></div>
+      <div class="acts"><button class="btn danger" data-act="delRec">ลบ</button><button class="btn" data-act="dupRec">ทำสำเนา</button><button class="btn pri" data-pdf="${r.id}">${ICON.pdf}Export PDF</button></div>
+    </div>
+    <div class="stack" id="recForm">
+      <div class="card"><div class="hd"><h2>ข้อมูลทั่วไป</h2></div><div class="bd"><div class="fgrid">
+        ${fld('Panel no. / Device no.', 'panel')}${fld('Location', 'location')}${fld('วันที่ทดสอบ', 'date', { type: 'date' })}${fld('กำหนด PM ครั้งถัดไป (ว่าง = อัตโนมัติ)', 'nextDue', { type: 'date' })}
+      </div></div></div>
+      <div class="card"><div class="hd"><h2>Check list</h2><span class="sub">สรุปอัตโนมัติจากผลทดสอบ</span></div><div class="bd"><div class="chkl">
+        ${ev.secs.map((s, i) => `<div class="row"><span><span class="no">${i + 1}.0</span>${esc(s.n)}</span><span data-sec="${s.k}">${chip(s.s)}</span></div>`).join('')}
+      </div></div></div>
+      <div class="card"><div class="hd"><h2>Technical data</h2></div><div class="bd">${techHTML(m)}</div></div>
+      ${m.insp.length ? `<div class="card"><div class="hd"><h2>General inspection</h2></div>${inspHTML(m)}</div>` : ''}
+      <div class="card"><div class="hd"><h2>ผลการทดสอบ</h2><span class="sub">ค่าคำนวณและผล Pass/Fail อัปเดตทันทีที่พิมพ์</span></div>${m.body()}</div>
+      <div class="card"><div class="hd"><h2>รูปภาพประกอบ</h2><label class="btn sm">${ICON.plus}เพิ่มรูป<input type="file" id="photoIn" accept="image/*" multiple hidden></label></div><div class="bd">
+        ${r.photos?.length ? `<div class="photos">${r.photos.map((p, i) => `<div class="ph"><img src="${p.src}" alt=""><div class="cap"><input data-k="photos.${i}.cap" value="${esc(p.cap || '')}" placeholder="คำอธิบายรูป"><button class="btn ghost sm" data-act="delPhoto" data-i="${i}" aria-label="ลบรูป">✕</button></div></div>`).join('')}</div>` : '<p class="note">ยังไม่มีรูป · รูปจะถูกย่อขนาดอัตโนมัติก่อนบันทึก</p>'}
+      </div></div>
+      <div class="card"><div class="hd"><h2>Comment / ข้อเสนอแนะ</h2></div><div class="bd">${F('comment', { area: 1 })}</div></div>
+    </div>`;
+}
+function refreshCalc() {
+  const r = DB.records.find(x => x.id === VIEW.id); if (!r) return;
+  const ev = evalRec(r); CALC = ev.c;
+  $$('[data-c]').forEach(el => { const h = fmtC(ev.c[el.dataset.c]); if (el.innerHTML !== h) el.innerHTML = h; });
+  ev.secs.forEach(s => { const el = $(`[data-sec="${s.k}"]`); if (el) el.innerHTML = chip(s.s); });
+  $('#overall').innerHTML = chip(ev.overall);
+  $('#recPanel').textContent = r.panel || 'ไม่ระบุตู้';
+}
+
+/* ---------- report ---------- */
+let rptScope = 'all';
+function sheetHead(p, title, no) {
+  return `<div class="rh"><div><div class="org">${esc(p.header)}</div><div class="rtitle">${esc(title)}</div></div><div class="rno">${no ? 'Form ' + no + '<br>' : ''}${esc(p.project)}</div></div>`;
+}
+function signBlock(p, date) {
+  const sig = (img, name) => img ? `<img src="${img}" alt="">` : '';
+  return `<div class="sign">
+    <div class="h">Responsibility</div><div class="h">Tested by</div><div class="h">Witnessed by</div>
+    <div class="l sg">Signature</div><div class="sg">${sig(p.sigTested)}</div><div class="sg">${sig(p.sigWitness)}</div>
+    <div class="l">Name</div><div>${esc(p.testedBy || '')}${p.testedPos ? '<br><small>' + esc(p.testedPos) + '</small>' : ''}</div><div>${esc(p.witnessedBy || '')}${p.witnessedPos ? '<br><small>' + esc(p.witnessedPos) + '</small>' : ''}</div>
+    <div class="l">Date</div><div>${esc(date || '')}</div><div>${esc(date || '')}</div></div>`;
+}
+function recordSheet(r, p, idx, total) {
+  const m = MOD[r.type], ev = evalRec(r);
+  MODE = 'report'; R = r; CALC = ev.c;
+  const tick = (s, k) => `<td class="tick">${s === k ? '✓' : ''}</td>`;
+  const html = `<div class="sheet">
+    ${sheetHead(p, m.name.toUpperCase(), m.code)}
+    <table class="info"><tr><td>Customer</td><td>: ${esc(p.customer)}</td><td style="width:90px;font-weight:600">Test date</td><td>: ${esc(r.date)}</td></tr>
+    <tr><td>Project</td><td>: ${esc(p.project)}</td><td style="font-weight:600">Next PM</td><td>: ${esc(r.nextDue || addMonths(r.date, p.interval))}</td></tr>
+    <tr><td>Location</td><td colspan="3">: ${esc(r.location)}</td></tr><tr><td>Panel no.</td><td colspan="3">: ${esc(r.panel)}</td></tr></table>
+    <h3>Check list</h3>
+    <table><thead><tr><th style="width:44px">Item</th><th>Descriptions</th><th style="width:50px">Pass</th><th style="width:50px">Fail</th><th style="width:74px">Investigate</th><th style="width:50px">N/A</th></tr></thead><tbody>
+    ${ev.secs.map((s, i) => `<tr><td style="text-align:center">${i + 1}.0</td><td>${esc(s.n)}</td>${tick(s.s, 'pass')}${tick(s.s, 'fail')}${tick(s.s, 'inv')}${tick(s.s, 'na')}</tr>`).join('')}
+    <tr><td></td><td style="font-weight:700">ผลสรุปรวม (Overall)</td><td colspan="4" style="text-align:center">${chip(ev.overall)}</td></tr>
+    </tbody></table>
+    <h3>Technical data</h3>
+    <div class="kvs">${m.tech.map(([k, l]) => `<div><span>${esc(l)}</span><b>: ${esc(r.tech?.[k] || '-')}</b></div>`).join('')}</div>
+    ${m.insp.length ? `<h3>General inspection</h3>${m.insp.map((g, gi) => `<table style="margin-top:4px"><thead><tr><th style="width:44px">Item</th><th>${g.no ? g.no + '. ' : ''}${esc(g.title)}</th><th style="width:100px">Result</th></tr></thead><tbody>${g.items.map((it, ii) => `<tr><td style="text-align:center">${g.no ? g.no + '.' + (ii + 1) : ii + 1}</td><td>${esc(it)}</td><td style="text-align:center">${chip(r.insp?.[`${gi}_${ii}`] || '')}</td></tr>`).join('')}</tbody></table>`).join('')}` : ''}
+    <h3>Test results</h3>
+    ${m.body()}
+    ${r.photos?.length ? `<h3>Photos</h3><div class="photos">${r.photos.map(ph => `<div class="ph"><img src="${ph.src}" alt=""><div class="cap">${esc(ph.cap || '')}</div></div>`).join('')}</div>` : ''}
+    <h3>Comment</h3><div style="border:1px solid #9aa6ad;min-height:34px;padding:4px 8px;white-space:pre-wrap">${esc(r.comment || '-')}</div>
+    ${findings(r).length ? `<h3>Recommendation</h3><ul style="margin:2px 0;padding-left:18px">${findings(r).map(f => `<li>${esc(f.what)} — ${esc(f.reco)}</li>`).join('')}</ul>` : ''}
+    ${signBlock(p, r.date)}
+    <div class="foot"><span>${esc(p.customer)} · ${esc(r.panel)}</span><span>${idx ? `Sheet ${idx} / ${total}` : ''}</span></div>
+  </div>`;
+  MODE = 'form';
+  return html;
+}
+function summarySheets(p, rs) {
+  const evs = rs.map(r => ({ r, e: evalRec(r) }));
+  const cnt = s => evs.filter(x => x.e.overall === s).length;
+  const fs = rs.flatMap(findings);
+  return `<div class="sheet">
+      ${sheetHead(p, 'PREVENTIVE MAINTENANCE REPORT', '')}
+      <div class="cover-t">รายงานการบำรุงรักษาเชิงป้องกันระบบไฟฟ้า<br><span style="font-size:20px">Electrical Preventive Maintenance Report</span></div>
+      <table class="info" style="font-size:13px"><tr><td style="width:120px">Customer</td><td>: ${esc(p.customer)}</td></tr><tr><td>Project</td><td>: ${esc(p.project)}</td></tr><tr><td>Location</td><td>: ${esc(p.site)}</td></tr><tr><td>Test date</td><td>: ${esc(p.date)}</td></tr>${p.contractor ? `<tr><td>Contractor</td><td>: ${esc(p.contractor)}</td></tr>` : ''}</table>
+      <h3 style="margin-top:14px">Executive summary</h3>
+      <div class="sumk"><div>อุปกรณ์ทั้งหมด<b>${rs.length}</b></div><div>Pass<b>${cnt('pass')}</b></div><div>Investigate<b>${cnt('inv')}</b></div><div>Fail<b>${cnt('fail')}</b></div></div>
+      <table><thead><tr><th>No.</th><th>Equipment</th><th>Panel</th><th>Test date</th><th>Result</th><th>Remark</th></tr></thead><tbody>
+      ${evs.map((x, i) => `<tr><td style="text-align:center">${i + 1}</td><td>${esc(MOD[x.r.type].name)}</td><td>${esc(x.r.panel)}</td><td>${esc(x.r.date)}</td><td style="text-align:center">${chip(x.e.overall)}</td><td>${esc(x.r.comment || '')}</td></tr>`).join('')}
+      </tbody></table>
+      <h3>Findings & recommendations</h3>
+      ${fs.length ? `<table><thead><tr><th>Result</th><th>Equipment</th><th>Item</th><th>Recommendation</th></tr></thead><tbody>${fs.map(f => `<tr><td style="text-align:center">${chip(f.s)}</td><td>${esc(recTitle(f.r))}</td><td>${esc(f.what)}</td><td>${esc(f.reco)}</td></tr>`).join('')}</tbody></table>` : '<p>ไม่พบข้อบกพร่อง</p>'}
+      <h3>Status by test item</h3>${chartStatus(rs)}
+      ${signBlock(p, p.date)}
+      <div class="foot"><span>${esc(p.customer)}</span><span>Summary</span></div>
+    </div>`;
+}
+function buildReport(scope) {
+  const p = proj();
+  if (scope && scope !== 'all' && scope !== 'summary') { const r = DB.records.find(x => x.id === scope); return r ? recordSheet(r, p) : ''; }
+  const rs = recs();
+  if (scope === 'summary') return summarySheets(p, rs);
+  return summarySheets(p, rs) + rs.map((r, i) => recordSheet(r, p, i + 1, rs.length)).join('');
+}
+function viewReport() {
+  const rs = recs();
+  if (rptScope !== 'all' && rptScope !== 'summary' && !rs.find(r => r.id === rptScope)) rptScope = 'all';
+  return `
+    <div class="top">
+      <div><div class="eyebrow">Export</div><h1>รายงาน / PDF</h1><div class="sub">ตัวอย่างหน้ากระดาษ A4 ตามแบบฟอร์ม · กด “บันทึกเป็น PDF” แล้วเลือกปลายทาง “Save as PDF”</div></div>
+      <div class="acts">
+        <select class="ipt" id="rptScope" style="width:auto">
+          <option value="all" ${rptScope === 'all' ? 'selected' : ''}>รายงานฉบับเต็ม (สรุป + ทุกอุปกรณ์)</option>
+          <option value="summary" ${rptScope === 'summary' ? 'selected' : ''}>เฉพาะหน้าสรุปผู้บริหาร</option>
+          ${rs.map(r => `<option value="${r.id}" ${rptScope === r.id ? 'selected' : ''}>${esc(MOD[r.type].code + ' ' + recTitle(r))}</option>`).join('')}
+        </select>
+        <button class="btn" data-act="dlPdf">${ICON.pdf}ดาวน์โหลด PDF</button>
+        <button class="btn pri" data-act="print">${ICON.pdf}บันทึกเป็น PDF / พิมพ์</button>
+      </div>
+    </div>
+    <div class="rpt-wrap" id="rptWrap">${buildReport(rptScope)}</div>`;
+}
+function doPrint(scope) {
+  $('#printRoot').innerHTML = buildReport(scope);
+  const p = proj(), old = document.title;
+  document.title = `PM_${(p.customer || 'report').replace(/\s+/g, '_')}_${scope === 'all' ? 'Full' : scope === 'summary' ? 'Summary' : (DB.records.find(r => r.id === scope)?.panel || '')}`;
+  setTimeout(() => { window.print(); document.title = old; }, 60);
+}
+function loadScript(src) { return new Promise((ok, no) => { const s = document.createElement('script'); s.src = src; s.onload = ok; s.onerror = no; document.head.appendChild(s); }); }
+async function downloadPdf(scope) {
+  toast('กำลังสร้างไฟล์ PDF…');
+  try {
+    if (!window.html2pdf) await loadScript('https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js');
+    const host = document.createElement('div');
+    host.style.cssText = 'position:fixed;left:-10000px;top:0;width:210mm';
+    host.innerHTML = buildReport(scope);
+    $$('.sheet', host).forEach(s => { s.style.boxShadow = 'none'; s.style.minHeight = '295mm'; });
+    document.body.appendChild(host);
+    const p = proj();
+    await html2pdf().set({ margin: 0, filename: `PM_${(p.customer || 'report').replace(/\s+/g, '_')}.pdf`, image: { type: 'jpeg', quality: 0.95 }, html2canvas: { scale: 2, useCORS: true, backgroundColor: '#ffffff' }, jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }, pagebreak: { mode: ['css'], after: '.sheet' } }).from(host).save();
+    host.remove();
+    toast('ดาวน์โหลด PDF แล้ว');
+  } catch (e) {
+    toast('สร้างไฟล์โดยตรงไม่ได้ (ต้องต่ออินเทอร์เน็ต) — ใช้ปุ่ม “บันทึกเป็น PDF / พิมพ์” แทน', 'bad');
+  }
+}
+
+/* ---------- calculators ---------- */
+const CALCS = [
+  { id: 'capc', title: 'ค่า Capacitance ของคาปาซิเตอร์', ins: [['q', 'พิกัด', 'kvar', 50], ['v', 'แรงดัน L-L', 'V', 400], ['f', 'ความถี่', 'Hz', 50]],
+    f: x => { const Xc = x.v * x.v / (x.q * 1e3), Ct = 1e6 / (2 * Math.PI * x.f * Xc); return [['Xc (ต่อเฟสเทียบเท่า)', fmt(Xc, 3) + ' Ω'], ['C total', fmt(Ct, 2) + ' µF'], ['C ต่อ unit (Delta)', fmt(Ct / 3, 2) + ' µF'], ['C วัดระหว่างสาย (Delta)', fmt(Ct / 2, 2) + ' µF'], ['C วัดระหว่างสาย (Star)', fmt(Ct / 6, 2) + ' µF'], ['กระแสพิกัด', fmt(x.q * 1e3 / (Math.sqrt(3) * x.v), 1) + ' A']]; },
+    note: 'C = Q / (2πf·V²) · Delta: C₍L-L₎ = 1.5 × C₍unit₎' },
+  { id: 'pfc', title: 'ขนาดคาปาซิเตอร์เพื่อปรับ PF', ins: [['p', 'โหลด P', 'kW', 500], ['pf1', 'PF ปัจจุบัน', '', 0.8], ['pf2', 'PF เป้าหมาย', '', 0.95], ['st', 'ขนาดต่อ step', 'kvar', 50]],
+    f: x => { const q = x.p * (Math.tan(Math.acos(x.pf1)) - Math.tan(Math.acos(x.pf2))); return [['kvar ที่ต้องการ', fmt(q, 1) + ' kvar'], ['จำนวน step', fmt(Math.ceil(q / x.st), 0) + ' step'], ['kVA ก่อนปรับ', fmt(x.p / x.pf1, 1) + ' kVA'], ['kVA หลังปรับ', fmt(x.p / x.pf2, 1) + ' kVA']]; },
+    note: 'Qc = P × (tanφ₁ − tanφ₂)' },
+  { id: 'ck', title: 'ค่า C/k ของ PF Controller', ins: [['q', 'Step เล็กสุด', 'kvar', 50], ['u', 'แรงดัน L-L', 'V', 400], ['cp', 'CT primary', 'A', 1600], ['cs', 'CT secondary', 'A', 5]],
+    f: x => { const k = x.cp / x.cs; return [['CT ratio k', fmt(k, 0)], ['C/k', fmt(x.q * 1e3 / (Math.sqrt(3) * x.u * k), 3) + ' A']]; },
+    note: 'C/k = Q / (√3 × U × k)' },
+  { id: 'irc', title: 'แก้ค่า Insulation resistance ตามอุณหภูมิ', ins: [['r', 'ค่าที่วัดได้', 'MΩ', 550], ['t', 'อุณหภูมิขณะวัด', '°C', 37]],
+    f: x => [['ค่าที่ 20 °C', fmt(x.r * Math.pow(2, (x.t - 20) / 10), 0) + ' MΩ'], ['ค่าที่ 40 °C', fmt(x.r * Math.pow(2, (x.t - 40) / 10), 0) + ' MΩ'], ['ตัวคูณแก้ค่า (→20 °C)', fmt(Math.pow(2, (x.t - 20) / 10), 3)]],
+    note: 'IEEE 43: ความต้านทานลดลงครึ่งหนึ่งทุก 10 °C' },
+  { id: 'fop', title: 'ระยะ Fall-of-potential (61.8 %)', ins: [['d', 'D: diagonal ของระบบกราวด์', 'm', 3], ['k', 'ตัวคูณ X', '× D', 4]],
+    f: x => [['ระยะ C2 (X)', fmt(x.d * x.k, 1) + ' m'], ['ระยะ P2 (0.618X)', fmt(x.d * x.k * 0.618, 1) + ' m'], ['จุดตรวจซ้ำ ±10 %', fmt(x.d * x.k * 0.518, 1) + ' / ' + fmt(x.d * x.k * 0.718, 1) + ' m']],
+    note: 'วัดซ้ำที่ P2 ขยับ ±10 % ของ X — ค่าไม่ควรต่างกันมาก' },
+  { id: 'lt', title: 'เวลาทริป Long time (I²t)', ins: [['in', 'In', 'A', 1600], ['ir', 'Ir', '× In', 0.8], ['tr', 'tr', 's', 150], ['km', '@ ตัวคูณอ้างอิง', '× Ir', 2], ['m', 'กระแสทดสอบ', '× Ir', 3]],
+    f: x => { const t = x.tr * Math.pow(x.km / x.m, 2); return [['กระแสฉีด', fmt(x.in * x.ir * x.m, 0) + ' A'], ['เวลาทริปที่ควรเป็น', fmt(t, 2) + ' s'], ['ช่วง ±20 %', fmt(t * .8, 1) + ' – ' + fmt(t * 1.2, 1) + ' s']]; },
+    note: 't = tr × (k₍ref₎ / k)²' },
+  { id: 'vd', title: 'แรงดันตก 3 เฟส', ins: [['i', 'กระแส', 'A', 200], ['l', 'ความยาวสาย', 'm', 50], ['r', 'R สาย', 'Ω/km', 0.153], ['x', 'X สาย', 'Ω/km', 0.08], ['pf', 'Power factor', '', 0.85], ['v', 'แรงดัน L-L', 'V', 400]],
+    f: x => { const s = Math.sin(Math.acos(x.pf)), dv = Math.sqrt(3) * x.i * x.l / 1000 * (x.r * x.pf + x.x * s); return [['ΔV', fmt(dv, 2) + ' V'], ['%ΔV', fmt(dv / x.v * 100, 2) + ' %']]; },
+    note: 'ΔV = √3 · I · L · (R cosφ + X sinφ)' }
+];
+function viewCalc() {
+  DB.calc = DB.calc || {};
+  return `
+    <div class="top"><div><div class="eyebrow">Engineering tools</div><h1>เครื่องคำนวณ</h1><div class="sub">สูตรที่ใช้บ่อยในงาน PM ระบบไฟฟ้าแรงต่ำ · ค่าที่พิมพ์ถูกจดจำไว้</div></div></div>
+    <div class="calcs">${CALCS.map(k => `<div class="card"><div class="hd"><h3>${esc(k.title)}</h3></div><div class="bd">
+      <div class="fgrid" style="grid-template-columns:repeat(auto-fill,minmax(130px,1fr))">${k.ins.map(([id, l, u, d]) => `<label class="fld"><span>${esc(l)}</span><span class="in"><input class="n" inputmode="decimal" id="k_${k.id}_${id}" data-calc="${k.id}" value="${esc(DB.calc[k.id + '_' + id] ?? d)}">${u ? `<span class="unit">${esc(u)}</span>` : ''}</span></label>`).join('')}</div>
+      <div class="out" id="o_${k.id}"></div><div class="formula">${esc(k.note)}</div></div></div>`).join('')}</div>`;
+}
+function updCalc(only) {
+  CALCS.forEach(k => {
+    if (only && only !== k.id) return;
+    const x = {}; let ok = true;
+    k.ins.forEach(([id]) => { const v = num($(`#k_${k.id}_${id}`).value); x[id] = v; if (isNaN(v)) ok = false; });
+    const out = ok ? k.f(x) : [['กรอกค่าให้ครบ', '–']];
+    $('#o_' + k.id).innerHTML = out.map(([a, b]) => `<div><span>${esc(a)}</span><b>${esc(b)}</b></div>`).join('');
+  });
+}
+
+/* ---------- settings ---------- */
+function viewSettings() {
+  const p = proj();
+  const pf = (k, l, o = {}) => `<label class="fld${o.wide ? ' wide' : ''}"><span>${esc(l)}</span><input data-p="${k}" value="${esc(p[k] ?? '')}" ${o.type ? `type="${o.type}"` : ''}></label>`;
+  const sig = (k, l) => `<div class="fld"><span>${l}</span><div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">${p[k] ? `<img src="${p[k]}" alt="" style="height:44px;background:#fff;border:1px solid var(--line);border-radius:4px">` : '<span class="sub">ยังไม่มีลายเซ็น</span>'}<button class="btn sm" data-sig="${k}">เซ็นชื่อ</button>${p[k] ? `<button class="btn ghost sm" data-sigclr="${k}">ลบ</button>` : ''}</div></div>`;
+  return `
+    <div class="top"><div><div class="eyebrow">Project</div><h1>ข้อมูลโครงการ & สำรองข้อมูล</h1><div class="sub">ข้อมูลส่วนนี้ใช้เป็นหัวกระดาษและช่องลงนามในรายงานทุกแผ่น</div></div>
+      <div class="acts"><button class="btn" data-act="newProj">${ICON.plus}โครงการใหม่</button></div></div>
+    <div class="stack">
+      <div class="card"><div class="hd"><h2>ข้อมูลโครงการ</h2></div><div class="bd"><div class="fgrid">
+        ${pf('customer', 'Customer')}${pf('project', 'Project')}${pf('site', 'Location (ค่าเริ่มต้นของอุปกรณ์ใหม่)')}${pf('date', 'วันที่ทดสอบ', { type: 'date' })}
+        ${pf('interval', 'รอบ PM (เดือน)', { type: 'number' })}${pf('contractor', 'ผู้ดำเนินการ / บริษัท')}${pf('header', 'หัวกระดาษรายงาน', { wide: 1 })}
+      </div></div></div>
+      <div class="card"><div class="hd"><h2>ผู้ทดสอบและผู้รับรอง</h2></div><div class="bd"><div class="fgrid">
+        ${pf('testedBy', 'Tested by (ชื่อ)')}${pf('testedPos', 'ตำแหน่ง / เลขใบอนุญาต กว.')}${pf('witnessedBy', 'Witnessed by (ชื่อ)')}${pf('witnessedPos', 'ตำแหน่ง')}
+        ${sig('sigTested', 'ลายเซ็นผู้ทดสอบ')}${sig('sigWitness', 'ลายเซ็นผู้รับรอง')}
+      </div></div></div>
+      <div class="card"><div class="hd"><h2>สำรองและย้ายข้อมูล</h2></div><div class="bd">
+        <p class="note">ข้อมูลทั้งหมดเก็บในเบราว์เซอร์เครื่องนี้เท่านั้น ควร Export ไฟล์ .json เก็บไว้ทุกครั้งหลังทำงาน และใช้ Import เพื่อย้ายไปเครื่องอื่น</p>
+        <div class="toolbar">
+          <button class="btn pri" data-act="export">Export ข้อมูล (.json)</button>
+          <label class="btn">Import ข้อมูล (.json)<input type="file" id="importIn" accept=".json,application/json" hidden></label>
+          <button class="btn" data-act="csv">Export สรุปผล (.csv)</button>
+          <button class="btn" data-act="sample">โหลดข้อมูลตัวอย่าง</button>
+          <button class="btn danger" data-act="delProj">ลบโครงการนี้</button>
+        </div>
+      </div></div>
+    </div>`;
+}
+
+/* ---------- modal / toast ---------- */
+function toast(msg, kind) {
+  $$('.toast').forEach(t => t.remove());
+  const t = document.createElement('div'); t.className = 'toast' + (kind ? ' ' + kind : ''); t.textContent = msg;
+  document.body.appendChild(t); setTimeout(() => t.remove(), 3800);
+}
+function ask(msg, yes, label = 'ยืนยัน') {
+  $('#modalRoot').innerHTML = `<div class="modal"><div class="card"><div class="hd"><h3>ยืนยันการทำรายการ</h3></div><div class="bd"><p style="margin:0 0 14px">${esc(msg)}</p><div class="toolbar" style="justify-content:flex-end"><button class="btn" data-m="no">ยกเลิก</button><button class="btn pri" data-m="yes">${esc(label)}</button></div></div></div></div>`;
+  $('#modalRoot [data-m="yes"]').onclick = () => { $('#modalRoot').innerHTML = ''; yes(); };
+  $('#modalRoot [data-m="no"]').onclick = () => { $('#modalRoot').innerHTML = ''; };
+}
+function sigPad(key) {
+  $('#modalRoot').innerHTML = `<div class="modal"><div class="card"><div class="hd"><h3>เซ็นชื่อ</h3></div><div class="bd"><canvas class="sigpad" id="sigC"></canvas><div class="toolbar" style="justify-content:space-between;margin-top:10px"><button class="btn ghost" data-m="clr">ล้าง</button><span class="toolbar"><button class="btn" data-m="no">ยกเลิก</button><button class="btn pri" data-m="ok">บันทึกลายเซ็น</button></span></div></div></div></div>`;
+  const c = $('#sigC'), r = c.getBoundingClientRect(), dpr = window.devicePixelRatio || 1;
+  c.width = r.width * dpr; c.height = r.height * dpr;
+  const x = c.getContext('2d'); x.scale(dpr, dpr); x.lineWidth = 2.2; x.lineCap = 'round'; x.strokeStyle = '#0b2a6b';
+  let dn = false, drawn = false;
+  const pt = e => { const b = c.getBoundingClientRect(); return [e.clientX - b.left, e.clientY - b.top]; };
+  c.onpointerdown = e => { dn = true; c.setPointerCapture(e.pointerId); x.beginPath(); x.moveTo(...pt(e)); };
+  c.onpointermove = e => { if (!dn) return; x.lineTo(...pt(e)); x.stroke(); drawn = true; };
+  c.onpointerup = () => dn = false;
+  $('#modalRoot [data-m="clr"]').onclick = () => { x.clearRect(0, 0, c.width, c.height); drawn = false; };
+  $('#modalRoot [data-m="no"]').onclick = () => $('#modalRoot').innerHTML = '';
+  $('#modalRoot [data-m="ok"]').onclick = () => { if (drawn) { proj()[key] = c.toDataURL('image/png'); save(); } $('#modalRoot').innerHTML = ''; render(); };
+}
+function resizeImg(file) {
+  return new Promise(ok => {
+    const fr = new FileReader();
+    fr.onload = () => { const im = new Image(); im.onload = () => { const s = Math.min(1, 1000 / Math.max(im.width, im.height)); const c = document.createElement('canvas'); c.width = im.width * s; c.height = im.height * s; c.getContext('2d').drawImage(im, 0, 0, c.width, c.height); ok(c.toDataURL('image/jpeg', 0.72)); }; im.onerror = () => ok(null); im.src = fr.result; };
+    fr.readAsDataURL(file);
+  });
+}
+function download(name, text, type) {
+  const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([text], { type })); a.download = name; document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 500);
+}
+
+/* =========================================================
+   Events
+   ========================================================= */
+document.addEventListener('click', e => {
+  const t = e.target.closest('[data-nav],[data-open],[data-new],[data-pdf],[data-act],[data-sig],[data-sigclr]');
+  if (!t) return;
+  if (t.dataset.nav) return go(JSON.parse(t.dataset.nav));
+  if (t.dataset.pdf) { e.stopPropagation(); rptScope = t.dataset.pdf; return go({ page: 'report' }); }
+  if (t.dataset.open) return go({ page: 'rec', id: t.dataset.open });
+  if (t.dataset.new) { const r = newRecord(t.dataset.new, proj().id); DB.records.push(r); save(); return go({ page: 'rec', id: r.id }); }
+  if (t.dataset.sig) return sigPad(t.dataset.sig);
+  if (t.dataset.sigclr) { proj()[t.dataset.sigclr] = ''; save(); return render(); }
+  const a = t.dataset.act, r = DB.records.find(x => x.id === VIEW.id), i = +t.dataset.i;
+  const rerender = () => { save(); const y = window.scrollY; render(); window.scrollTo(0, y); };
+  switch (a) {
+    case 'allPass': { const g = +t.dataset.g; MOD[r.type].insp[g].items.forEach((_, ii) => r.insp[`${g}_${ii}`] = 'pass'); return rerender(); }
+    case 'addSet': r.t.settings.push(['', '']); return rerender();
+    case 'delSet': r.t.settings.splice(i, 1); return rerender();
+    case 'addStep': r.t.rows.push({}); return rerender();
+    case 'delStep': if (r.t.rows.length > 1) r.t.rows.pop(); return rerender();
+    case 'addRow': r.t.rows.push({}); return rerender();
+    case 'delRow': r.t.rows.splice(i, 1); return rerender();
+    case 'addPt': r.t.pts.push({}); return rerender();
+    case 'delPt': r.t.pts.splice(i, 1); return rerender();
+    case 'delPhoto': r.photos.splice(i, 1); return rerender();
+    case 'dupRec': { const c = clone(r); c.id = uid(); c.panel = (r.panel || '') + ' (สำเนา)'; c.updated = Date.now(); DB.records.push(c); save(); toast('ทำสำเนาแล้ว'); return go({ page: 'rec', id: c.id }); }
+    case 'delRec': return ask(`ลบ ${recTitle(r)} ? ข้อมูลที่ลบกู้คืนไม่ได้`, () => { DB.records = DB.records.filter(x => x.id !== r.id); save(); go({ page: 'list', type: r.type }); toast('ลบแล้ว'); }, 'ลบ');
+    case 'print': return doPrint(rptScope);
+    case 'dlPdf': return downloadPdf(rptScope);
+    case 'export': { const p = proj(); download(`PM_backup_${(p.customer || 'data').replace(/\s+/g, '_')}_${today()}.json`, JSON.stringify(DB, null, 1), 'application/json'); return toast('Export แล้ว'); }
+    case 'csv': {
+      const rows = [['Code', 'Equipment', 'Panel', 'Location', 'Test date', 'Section', 'Result', 'Overall']];
+      recs().forEach(r2 => { const ev = evalRec(r2); ev.secs.forEach(s => rows.push([MOD[r2.type].code, MOD[r2.type].name, r2.panel, r2.location, r2.date, s.n, ST_LABEL[s.s], ST_LABEL[ev.overall]])); });
+      download(`PM_summary_${today()}.csv`, '﻿' + rows.map(r2 => r2.map(v => `"${String(v ?? '').replace(/"/g, '""')}"`).join(',')).join('\n'), 'text/csv');
+      return toast('Export CSV แล้ว');
+    }
+    case 'sample': return ask('โหลดข้อมูลตัวอย่าง (Supamitr General Hospital · MDB01) เป็นโครงการเพิ่มเติม?', () => { const cur = DB; const s = sampleDB(); DB = cur; DB.projects.push(...s.projects); DB.records.push(...s.records); DB.cur = s.cur; save(); go({ page: 'dash' }); }, 'โหลด');
+    case 'newProj': { const p = blankProject(); DB.projects.push(p); DB.cur = p.id; save(); toast('สร้างโครงการใหม่แล้ว'); return go({ page: 'settings' }); }
+    case 'delProj': return ask('ลบโครงการนี้และอุปกรณ์ทั้งหมดในโครงการ? แนะนำให้ Export สำรองก่อน', () => {
+      const id = proj().id; DB.records = DB.records.filter(x => x.projectId !== id); DB.projects = DB.projects.filter(x => x.id !== id);
+      if (!DB.projects.length) DB.projects.push(blankProject()); DB.cur = DB.projects[0].id; save(); go({ page: 'dash' });
+    }, 'ลบโครงการ');
+  }
+});
+document.addEventListener('input', e => {
+  const el = e.target;
+  if (el.id === 'listQ') { listQ = el.value; const pos = el.selectionStart; render(); const n = $('#listQ'); n.focus(); n.setSelectionRange(pos, pos); return; }
+  if (el.dataset.calc) { DB.calc[el.id.slice(2)] = el.value; save(); return updCalc(el.dataset.calc); }
+  if (el.dataset.p) { const p = proj(); p[el.dataset.p] = el.type === 'number' ? Number(el.value) || 12 : el.value; save(); if (el.dataset.p === 'customer' || el.dataset.p === 'project') renderNav(); return; }
+  if (el.dataset.k && VIEW.page === 'rec') {
+    const r = DB.records.find(x => x.id === VIEW.id); if (!r) return;
+    setP(r, el.dataset.k, el.type === 'checkbox' ? el.checked : el.value);
+    r.updated = Date.now();
+    if (el.classList.contains('st')) el.className = 'st v-' + el.value;
+    save(); refreshCalc();
+  }
+});
+document.addEventListener('change', async e => {
+  const el = e.target;
+  if (el.id === 'projSel') {
+    if (el.value === '__new') { const p = blankProject(); DB.projects.push(p); DB.cur = p.id; save(); return go({ page: 'settings' }); }
+    DB.cur = el.value; save(); return go({ page: VIEW.page === 'rec' ? 'dash' : VIEW.page, type: VIEW.type });
+  }
+  if (el.id === 'capSel') { capSel = el.value; return render(); }
+  if (el.id === 'rptScope') { rptScope = el.value; $('#rptWrap').innerHTML = buildReport(rptScope); return; }
+  if (el.dataset.k && el.type === 'checkbox') return; // handled by input
+  if (el.id === 'photoIn') {
+    const r = DB.records.find(x => x.id === VIEW.id); r.photos = r.photos || [];
+    for (const f of el.files) { const src = await resizeImg(f); if (src) r.photos.push({ src, cap: f.name.replace(/\.[^.]+$/, '') }); }
+    save(); const y = window.scrollY; render(); window.scrollTo(0, y); return;
+  }
+  if (el.id === 'importIn' && el.files[0]) {
+    try {
+      const d = JSON.parse(await el.files[0].text());
+      if (!d.projects || !d.records) throw 0;
+      ask(`นำเข้า ${d.projects.length} โครงการ / ${d.records.length} อุปกรณ์ โดยแทนที่ข้อมูลปัจจุบันทั้งหมด?`, () => { DB = d; DB.calc = DB.calc || {}; save(); go({ page: 'dash' }); toast('นำเข้าข้อมูลแล้ว'); }, 'นำเข้า');
+    } catch (err) { toast('ไฟล์ไม่ถูกต้อง: ต้องเป็นไฟล์ .json ที่ Export จากโปรแกรมนี้', 'bad'); }
+    el.value = '';
+  }
+});
+window.addEventListener('beforeprint', () => { if (!$('#printRoot').innerHTML) $('#printRoot').innerHTML = buildReport(VIEW.page === 'rec' ? VIEW.id : rptScope); });
+window.addEventListener('afterprint', () => { $('#printRoot').innerHTML = ''; });
+
+DB = loadDB(); DB.calc = DB.calc || {};
+if (!DB.projects.find(p => p.id === DB.cur)) DB.cur = DB.projects[0]?.id;
+render();
+</script>
+</body>
+</html>
