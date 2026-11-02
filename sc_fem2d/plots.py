@@ -122,6 +122,8 @@ def plot_waveform(an, path):
 def make_all(an, outdir):
     os.makedirs(outdir, exist_ok=True)
     files = {}
+    from .dimensions import plot_cross_section
+    files["dimensions"] = plot_cross_section(an.d, os.path.join(outdir, "00_cross_section_dimensions.png"))
     files["geometry"] = os.path.join(outdir, "01_geometry_mesh.png"); plot_geometry(an, files["geometry"])
     files["noload"] = os.path.join(outdir, "02_field_no_load.png")
     plot_field(an, an.res.solutions["no_load"], "No-load flux lines and |B| at rated voltage", files["noload"])

@@ -59,6 +59,7 @@ Mesh: {r.mesh_stats['elements']} elements / {r.mesh_stats['nodes']} nodes. Runti
 | Rotor slots | {d.Qr_pitches - 2 * d.Qr_omit_per_pole} wound of {d.Qr_pitches} pitches, {d.Nf_per_slot} turns/slot |
 | Rotor peripheral speed | {d.omega / (d.poles / 2) * d.R_rotor:.0f} m/s |
 
+![cross-section dimensions]({rel(files['dimensions'])})
 ![geometry]({rel(files['geometry'])})
 
 ## 2. No-load / open circuit

@@ -2,7 +2,7 @@
 
 Example machine: **100 MVAr, 13.8 kV, 50 Hz, 2-pole, 3000 rpm**, round (cylindrical) rotor.
 Nonlinear magnetostatic A<sub>z</sub> FEM, first-order triangles, Newton–Raphson, sliding air-gap interface.
-Mesh: 21840 elements / 11113 nodes. Runtime 75 s.
+Mesh: 21840 elements / 11113 nodes. Runtime 85 s.
 
 ## 1. Main dimensions
 
@@ -17,6 +17,7 @@ Mesh: 21840 elements / 11113 nodes. Runtime 75 s.
 | Rotor slots | 24 wound of 32 pitches, 10 turns/slot |
 | Rotor peripheral speed | 157 m/s |
 
+![cross-section dimensions](00_cross_section_dimensions.png)
 ![geometry](01_geometry_mesh.png)
 
 ## 2. No-load / open circuit

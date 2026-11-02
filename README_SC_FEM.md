@@ -13,6 +13,7 @@ python run_sc_fem.py              # full study, about 1–2 min
 python run_sc_fem.py --quick      # coarser sweeps
 python run_sc_fem.py --S 160 --V 15.75 --length 3.4 --out results_160
 python -m unittest discover -s tests -v
+python draw_cross_section.py      # dimensioned stator/rotor drawing only, about 2 s
 ```
 
 The run writes `results/report.md`, `results/results.json`, and seven figures.
@@ -37,6 +38,7 @@ The run writes `results/report.md`, `results/results.json`, and seven figures.
 * `sc_fem2d/solver.py`: FEM assembly, Newton–Raphson, flux linkage, torque
 * `sc_fem2d/analysis.py`: condenser performance analyses
 * `sc_fem2d/plots.py`, `run_sc_fem.py`: figures and report
+* `sc_fem2d/dimensions.py`, `draw_cross_section.py`: dimensioned cross-section drawing
 * `tests/test_sc_fem2d.py`: verification tests (reciprocity, EMF formula, virtual work against Arkkio torque, linearity, mesh and winding checks)
 
 To change the machine, edit the defaults of `SCDesign` in `sc_fem2d/machine.py`.
@@ -64,6 +66,7 @@ the line-to-line voltage.
 * ขีดความสามารถ Q ด้าน under-excited
 * รูปคลื่น EMF และค่า THD
 * แรงบิดเทียบกับมุมกระแส
+* แบบภาพตัดขวาง stator/rotor พร้อมขนาด (รันเฉพาะรูปนี้ได้ด้วย `python draw_cross_section.py`)
 * การประมาณค่ากำลังสูญเสีย
 
 หากต้องการเปลี่ยนขนาดเครื่อง ให้แก้ค่าใน `SCDesign` (ไฟล์ `sc_fem2d/machine.py`)
