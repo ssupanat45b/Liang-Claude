@@ -27,7 +27,9 @@ import warnings
 #              symmetric positive definite (monotone B-H curves), so CG is exact up to tol.
 #   pardiso  : Intel MKL PARDISO via 'pypardiso' (multithreaded CPU direct solver)
 #   superlu  : SciPy built-in direct solver (always available)
-#   auto     : gpu if available, else pardiso if installed, else superlu
+#   auto     : pardiso if installed, else superlu (CPU).  Measured on an RTX 4060 vs a
+#              Core Ultra 7 265K, the sparse direct CPU solver is 2-8x faster than GPU PCG for
+#              these 2-D meshes (10k-100k nodes), so the GPU is used only when requested.
 # Any GPU failure (no device, out of memory, CG not converged) falls back to the CPU.
 # ---------------------------------------------------------------------------
 _state = {"backend": None, "cp": None, "csp": None, "cspl": None, "pardiso": None,
@@ -36,7 +38,10 @@ _state = {"backend": None, "cp": None, "csp": None, "cspl": None, "pardiso": Non
 
 def _try_gpu():
     try:
-        import cupy as cp
+        import warnings as _w
+        with _w.catch_warnings():                           # CuPy warns about CUDA_PATH even when
+            _w.simplefilter("ignore")                       # pip-installed CUDA libraries work
+            import cupy as cp
         import cupyx.scipy.sparse as csp
         import cupyx.scipy.sparse.linalg as cspl
         if cp.cuda.runtime.getDeviceCount() < 1:
@@ -78,7 +83,7 @@ def _try_pardiso():
 def set_backend(name: str = "auto") -> str:
     """Choose the linear solver: auto | gpu | pardiso | superlu.  Returns the active name."""
     name = (name or "auto").lower()
-    if name in ("auto", "gpu") and _try_gpu():
+    if name == "gpu" and _try_gpu():
         _state["backend"] = "gpu"
     elif name == "gpu":
         warnings.warn("GPU backend requested but CuPy/CUDA device not available - using CPU")

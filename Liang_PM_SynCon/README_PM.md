@@ -12,9 +12,9 @@ The magnets are 23 mm thick, sized so the machine delivers 300 kVAr at 400 V.
 
 ```bash
 pip install -r requirements.txt
-pip install cupy-cuda12x            # optional: GPU solver (NVIDIA, CUDA 12)
-python benchmark_solver.py          # find the fastest solver on this PC
+python benchmark_solver.py          # compare solver speed on this PC
 python run_pm_fem.py                # full study -> results_pm300/
+python run_pm_fem.py --mesh fine    # final values (about 1 % from FEMM)
 python run_pm_fem.py --size-magnets # re-size the magnet thickness first
 python draw_pm_cross_section.py     # dimensioned drawing only (~2 s)
 python sweep_pm.py                  # magnet thickness 16–28 mm
@@ -26,13 +26,26 @@ python -m unittest discover -s tests -v
 
 | Backend | Option | Notes |
 |---|---|---|
-| GPU (NVIDIA, e.g. RTX 4060) | `--solver gpu` | CuPy, Jacobi-preconditioned conjugate gradient on the GPU. `auto` (default) picks it when CuPy and a CUDA device are present. It falls back to the CPU automatically if a GPU solve fails |
-| Intel MKL PARDISO | `--solver pardiso` | `pip install pypardiso`; multithreaded CPU |
-| SciPy SuperLU | `--solver superlu` | always available |
+| SciPy SuperLU | `--solver superlu` | always available; the default (`auto`) unless pypardiso is installed |
+| Intel MKL PARDISO | `--solver pardiso` | `pip install pypardiso`; multithreaded CPU; picked by `auto` when installed |
+| GPU (NVIDIA) | `--solver gpu` | `pip install "cupy-cuda12x[ctk]"`; Jacobi-preconditioned CG on the GPU; used only on request |
 
-On a 2-D model this size the GPU pays off mainly with the `fine` and `ultra` meshes.
-Run `python benchmark_solver.py` once to see the timings on your machine. For sweeps,
-use `--jobs 2` with the GPU (cases share one card) or `--jobs 6–8` on the CPU.
+**Measured on Core Ultra 7 265K + RTX 4060** (one nonlinear solve):
+
+| Mesh | Nodes | CPU SuperLU | GPU (CuPy PCG) |
+|---|---|---|---|
+| coarse | 10.7k | 0.25 s | 1.65 s |
+| normal | 13.0k | 0.27 s | 2.29 s |
+| fine | 47.6k | 1.47 s | 4.49 s |
+| ultra | 99.1k | 4.68 s | 8.06 s |
+
+For 2-D models of this size the sparse direct CPU solver wins: the GPU has to run
+about 1000 CG iterations per Newton step on an ill-conditioned magnetic matrix. Use the
+CPU and parallel sweeps (`--jobs 6–8`). The GPU option is kept for experiments.
+
+**Accuracy:** with the 3–3.5 mm air gap of the 300 kVAr designs, use `--mesh fine` for
+final values. Against FEMM 4.2 the flux linkage differs by −4.7 % (normal), −2.1 % (fine)
+and −1.3 % (ultra).
 
 ## Outputs (`results_pm300/`)
 
