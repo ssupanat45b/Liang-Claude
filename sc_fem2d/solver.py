@@ -15,6 +15,32 @@ import numpy as np
 import scipy.sparse as sp
 from scipy.sparse.linalg import spsolve
 
+import os
+
+# Linear solver backend.  SC_FEM_SOLVER = auto | pardiso | superlu
+#  * pardiso : Intel MKL PARDISO via the optional 'pypardiso' package (multithreaded,
+#              fastest on Intel CPUs, install with  pip install pypardiso)
+#  * superlu : SciPy built-in (single-threaded), always available
+_BACKEND = os.environ.get("SC_FEM_SOLVER", "auto").lower()
+_pardiso = None
+if _BACKEND in ("auto", "pardiso"):
+    try:
+        import pypardiso as _pardiso       # noqa: F401
+    except ImportError:
+        if _BACKEND == "pardiso":
+            raise
+        _pardiso = None
+
+
+def linear_solve(K, b):
+    if _pardiso is not None:
+        return _pardiso.spsolve(K.tocsr(), b)
+    return spsolve(K.tocsc(), b)
+
+
+def backend_name() -> str:
+    return "MKL PARDISO (pypardiso)" if _pardiso is not None else "SciPy SuperLU"
+
 from . import machine as mc
 from .materials import NU0, ROTOR_FORGING, STATOR_LAMINATION
 
@@ -147,7 +173,7 @@ class MagnetostaticModel:
             K = sp.csr_matrix((Ke.ravel(), (s["rows"], s["cols"])), shape=(s["nn"],) * 2)
             Kff = K[free][:, free]
             dA = np.zeros_like(A)
-            dA[free] = spsolve(Kff.tocsc(), -R[free])
+            dA[free] = linear_solve(Kff, -R[free])
             # backtracking line search on the residual norm
             r_old = np.linalg.norm(R[free])
             step = 1.0

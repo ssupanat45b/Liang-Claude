@@ -34,7 +34,8 @@
   "ke": 0.00019,
   "build_factor": 1.5,
   "rho_fe": 7650.0,
-  "gap_layers": 6
+  "gap_layers": 6,
+  "radial_refine": 1
  },
  "mesh": {
   "nodes": 11113,
@@ -603,5 +604,30 @@
   ],
   "T_base": 318309.8861837907,
   "T_max_pu": 1.7088216113114123
+ },
+ "summary": {
+  "D_bore": 1.12,
+  "D_rotor": 1.0,
+  "D_out": 2.24,
+  "L_stack": 2.9,
+  "surface_speed": 157.07963267948966,
+  "electric_loading_kA_m": 114.14676923846623,
+  "B_gap1": 0.7705736670022953,
+  "flux_per_pole_Wb": 2.5028232704234554,
+  "esson_C_kVAmin_m3": 9.163148017827819,
+  "B_stator_tooth_max": 1.4363462957869302,
+  "B_stator_yoke_max": 1.22336977563947,
+  "B_rotor_tooth_max": 1.6700382992757226,
+  "B_rotor_body_max": 1.8344901789831394,
+  "J_arm": 2.365951170167654,
+  "J_field": 7.083947818099478,
+  "mass_stator_core_t": 55.02916729948356,
+  "mass_rotor_iron_active_t": 14.459472530916038,
+  "mass_arm_cu_t": 7.251986486126496,
+  "mass_field_cu_t": 2.7150914012944036,
+  "J_rotor_kgm2": 2053.4892246068102,
+  "H_inertia_s": 1.0133563144384474,
+  "A_bar_mm2": 1768.294145532561,
+  "ampere_turns_rated": 270134.3512379234
  }
 }

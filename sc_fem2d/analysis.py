@@ -41,6 +41,7 @@ class SCResults:
     torque_angle: dict = field(default_factory=dict)
     losses: dict = field(default_factory=dict)
     gap_field: dict = field(default_factory=dict)
+    summary: dict = field(default_factory=dict)
     solutions: dict = field(default_factory=dict)
 
 
@@ -267,8 +268,12 @@ class SCAnalysis:
         self.log("[8] loss estimate ...")
         d = self.d
         s = self.model.element_data(0)
-        Bm = self.res.waveform["Bmax_stator"]
         iron = s["iron_s"]
+        if "Bmax_stator" in self.res.waveform:
+            Bm = self.res.waveform["Bmax_stator"]
+        else:   # no rotation sweep: use the no-load snapshot (if any) as an estimate
+            sol0 = self.res.solutions.get("no_load") or self.solve(i_f=self.res.occ["If_noload"])
+            Bm = sol0.Bmag
         mass_e = s["area"][iron] * d.L_stack * d.stacking * d.rho_fe
         p = (d.kh * d.f + d.ke * d.f**2) * Bm[iron] ** 2
         P_fe = d.build_factor * float(np.sum(p * mass_e))
@@ -301,6 +306,54 @@ class SCAnalysis:
                  f"field Cu {out['P_field_cu_kW']:.0f} kW  (excl. friction/windage/stray)")
         return out
 
+    def design_summary(self):
+        """Key design parameters: loadings, flux densities, current densities, masses, inertia."""
+        from .dimensions import geometry
+        d, r = self.d, self.res
+        g = geometry(d)
+        s = self.model.element_data(0)
+        sol = r.solutions.get("no_load") or self.solve(i_f=r.occ["If_noload"])
+        B = sol.Bmag
+        cen = s["cen"]; rc = np.hypot(cen[:, 0], cen[:, 1])
+        p98 = lambda m: float(np.percentile(B[m], 98)) if np.any(m) else float("nan")
+        teeth = s["iron_s"] & (rc < g["s3"])
+        yoke = s["iron_s"] & (rc >= g["s3"])
+        r_teeth = s["iron_r"] & (rc > g["r_slot_bottom"])
+        r_body = s["iron_r"] & (rc <= g["r_slot_bottom"])
+        D = 2 * d.R_bore
+        A_el = 6 * d.series_turns * d.I_rated / (math.pi * D)
+        B1 = r.gap_field.get("B1") if r.gap_field else None
+        if B1 is None:
+            B1 = float(fundamental_axis(*self.model.gap_flux_density(sol)[:2])[0])
+        Phi = B1 * D * d.L_stack                         # flux per pole (2-pole)
+        # masses
+        rho_cu, rho_st = 8900.0, 7850.0
+        L = r.losses or {}
+        side = np.mean(list(s["side_area"].values()))
+        slot = np.mean(list(s["slot_area"].values()))
+        m_cu_a = d.Qs * 2 * side * d.fill_arm * (d.L_stack + d.end_arm) * rho_cu
+        m_cu_f = len(s["slot_area"]) * slot * d.fill_field * (d.L_stack + d.end_field) * rho_cu
+        m_rot_fe = float(np.sum(s["area"][s["iron_r"]])) * d.L_stack * rho_st
+        m_stat_fe = float(np.sum(s["area"][s["iron_s"]])) * d.L_stack * d.stacking * d.rho_fe
+        J_rot = 0.5 * (m_rot_fe + m_cu_f * d.L_stack / (d.L_stack + d.end_field)) * d.R_rotor**2
+        wm = d.omega / (d.poles / 2)
+        out = dict(
+            D_bore=D, D_rotor=2 * d.R_rotor, D_out=2 * d.R_stator_out, L_stack=d.L_stack,
+            surface_speed=wm * d.R_rotor, electric_loading_kA_m=A_el / 1e3, B_gap1=B1,
+            flux_per_pole_Wb=Phi,
+            esson_C_kVAmin_m3=d.S_rated / 1e3 / (D**2 * d.L_stack * d.rpm),
+            B_stator_tooth_max=p98(teeth), B_stator_yoke_max=p98(yoke),
+            B_rotor_tooth_max=p98(r_teeth), B_rotor_body_max=p98(r_body),
+            J_arm=L.get("J_arm_A_mm2", float("nan")), J_field=L.get("J_field_A_mm2", float("nan")),
+            mass_stator_core_t=m_stat_fe / 1e3, mass_rotor_iron_active_t=m_rot_fe / 1e3,
+            mass_arm_cu_t=m_cu_a / 1e3, mass_field_cu_t=m_cu_f / 1e3,
+            J_rotor_kgm2=J_rot, H_inertia_s=0.5 * J_rot * wm**2 / d.S_rated,
+            A_bar_mm2=side * d.fill_arm / d.turns_per_coil * 1e6,
+            ampere_turns_rated=r.rated.get("If_rated_over", float("nan")) * len(s["slot_area"]) * d.Nf_per_slot / 2,
+        )
+        self.res.summary = out
+        return out
+
     def gap_field(self):
         sol = self.res.solutions["no_load"]
         th, Br, Bt = self.model.gap_flux_density(sol)
@@ -308,19 +361,22 @@ class SCAnalysis:
         self.res.gap_field = dict(theta=th, Br=Br, Bt=Bt, harm=h, B1=h[1])
         return self.res.gap_field
 
+    def occ_auto(self, quick=False):
+        """OCC with the If range scaled from an unsaturated air-gap-line estimate."""
+        sol = self.solve(i_f=100.0)
+        If_ag = 100.0 * self.d.V_phase / self.E_phase(self.psi_dq(sol)[0])
+        frac = [0.05, 0.4, 0.7, 0.9, 1.0, 1.1, 1.2, 1.35, 1.5, 1.75, 2.0]
+        if quick:
+            frac = [0.05, 0.5, 0.9, 1.05, 1.2, 1.5, 2.0]
+        return self.open_circuit(np.array(frac) * If_ag)
+
     # ---------------------------------------------------------------- all
     def run_all(self, quick=False):
         d = self.d
         self.log(f"Synchronous condenser {d.S_rated / 1e6:.0f} MVAr, {d.V_line / 1e3:.1f} kV, "
                  f"{d.f:.0f} Hz, {d.rpm:.0f} rpm | mesh: {self.res.mesh_stats}")
         self.find_axes()
-        # scale the OCC sweep from a quick unsaturated estimate of the air-gap line
-        sol = self.solve(i_f=100.0)
-        If_ag = 100.0 * d.V_phase / self.E_phase(self.psi_dq(sol)[0])
-        frac = [0.05, 0.4, 0.7, 0.9, 1.0, 1.1, 1.2, 1.35, 1.5, 1.75, 2.0]
-        if quick:
-            frac = [0.05, 0.5, 0.9, 1.05, 1.2, 1.5, 2.0]
-        self.open_circuit(np.array(frac) * If_ag)
+        self.occ_auto(quick)
         self.reactances()
         self.rated_points()
         self.v_curve(5 if quick else 7)
@@ -328,4 +384,5 @@ class SCAnalysis:
         self.gap_field()
         self.torque_vs_angle(9 if quick else 13)
         self.losses()
+        self.design_summary()
         return self.res

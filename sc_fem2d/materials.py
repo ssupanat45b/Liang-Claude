@@ -16,7 +16,8 @@ class BHMaterial:
     def __init__(self, name: str, B: list[float], H: list[float], b_max: float = 3.0):
         self.name = name
         B, H = np.asarray(B, float), np.asarray(H, float)
-        # monotone piecewise-linear H(B); beyond the table the slope tends to mu0
+        self.B_table, self.H_table = B.copy(), H.copy()     # raw data (used for FEMM export)
+        # smooth monotone (PCHIP) H(B); beyond the table the slope tends to mu0
         b2 = np.linspace(0.0, b_max**2, 6001)
         b = np.sqrt(b2)
         Hb = PchipInterpolator(B, H)(np.minimum(b, B[-1]))  # smooth, monotone

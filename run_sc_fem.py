@@ -19,7 +19,8 @@ import time
 import numpy as np
 
 from sc_fem2d.analysis import SCAnalysis
-from sc_fem2d.machine import SCDesign
+from sc_fem2d.machine import SCDesign, apply_mesh_preset
+from sc_fem2d.solver import backend_name
 from sc_fem2d import plots
 
 
@@ -45,6 +46,8 @@ def write_report(an, files, path, runtime):
 Example machine: **{d.S_rated / 1e6:.0f} MVAr, {d.V_line / 1e3:.1f} kV, {d.f:.0f} Hz, {d.poles}-pole, {d.rpm:.0f} rpm**, round (cylindrical) rotor.
 Nonlinear magnetostatic A<sub>z</sub> FEM, first-order triangles, Newton–Raphson, sliding air-gap interface.
 Mesh: {r.mesh_stats['elements']} elements / {r.mesh_stats['nodes']} nodes. Runtime {runtime:.0f} s.
+
+![design summary]({rel(files['summary'])})
 
 ## 1. Main dimensions
 
@@ -132,13 +135,21 @@ def main():
     ap.add_argument("--V", type=float, help="rated line voltage kV")
     ap.add_argument("--f", type=float, help="frequency Hz")
     ap.add_argument("--length", type=float, help="active core length m")
+    ap.add_argument("--gap", type=float, help="air gap m (stator bore kept fixed)")
+    ap.add_argument("--mesh", default="normal", choices=["coarse", "normal", "fine", "ultra"],
+                    help="mesh density preset (default normal)")
     args = ap.parse_args()
 
-    d = SCDesign()
+    d = apply_mesh_preset(SCDesign(), args.mesh)
     if args.S: d.S_rated = args.S * 1e6
     if args.V: d.V_line = args.V * 1e3
     if args.f: d.f = args.f
     if args.length: d.L_stack = args.length
+    if args.gap:
+        bore = d.R_bore
+        d.gap = args.gap
+        d.R_rotor = bore - d.gap
+    print(f"linear solver: {backend_name()} | mesh preset: {args.mesh}")
 
     t0 = time.time()
     an = SCAnalysis(d)
@@ -150,7 +161,7 @@ def main():
     data = dict(design=d.__dict__, mesh=r.mesh_stats, axes=r.axes, occ=r.occ, params=r.params,
                 rated=r.rated, vcurve=r.vcurve, losses=r.losses,
                 waveform={k: v for k, v in r.waveform.items() if k != "Bmax_stator"},
-                torque_angle=r.torque_angle)
+                torque_angle=r.torque_angle, summary=r.summary)
     with open(os.path.join(args.out, "results.json"), "w") as fh:
         json.dump(to_jsonable(data), fh, indent=1)
     print(f"\nDone in {runtime:.0f} s.  Report: {os.path.join(args.out, 'report.md')}")

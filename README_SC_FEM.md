@@ -14,6 +14,8 @@ python run_sc_fem.py --quick      # coarser sweeps
 python run_sc_fem.py --S 160 --V 15.75 --length 3.4 --out results_160
 python -m unittest discover -s tests -v
 python draw_cross_section.py      # dimensioned stator/rotor drawing only, about 2 s
+python sweep_design.py            # design sweep (default: air gap 50/60/70 mm)
+python femm_compare.py            # cross-check against FEMM 4.2 (Windows, needs pyfemm)
 ```
 
 The run writes `results/report.md`, `results/results.json`, and seven figures.
@@ -39,10 +41,29 @@ The run writes `results/report.md`, `results/results.json`, and seven figures.
 * `sc_fem2d/analysis.py`: condenser performance analyses
 * `sc_fem2d/plots.py`, `run_sc_fem.py`: figures and report
 * `sc_fem2d/dimensions.py`, `draw_cross_section.py`: dimensioned cross-section drawing
+* `sweep_design.py`: parallel parameter study of any `SCDesign` field
+* `femm_compare.py`: builds the same model in FEMM 4.2 and compares ψ, E, B₁, torque and Xd
 * `tests/test_sc_fem2d.py`: verification tests (reciprocity, EMF formula, virtual work against Arkkio torque, linearity, mesh and winding checks)
 
 To change the machine, edit the defaults of `SCDesign` in `sc_fem2d/machine.py`.
 These cover dimensions, slots, turns, air gap, and the end-winding reactance.
+
+## Run settings (example: Intel Core Ultra 7 265K, 32 GB RAM, RTX 4060)
+
+| Setting | Option | Recommendation |
+|---|---|---|
+| Mesh density | `--mesh coarse/normal/fine/ultra` | `normal` for design work; `fine` (74k elements) for final values; `ultra` (162k) for a mesh-convergence check |
+| Parallel sweep | `sweep_design.py --jobs N` | `--jobs 6` to `8` on 20 cores; each case uses one core and under 1 GB RAM |
+| Faster solver | `pip install pypardiso` | Intel MKL PARDISO is multithreaded and usually 2–5× faster than SuperLU on Intel CPUs; picked up automatically (force with `set SC_FEM_SOLVER=superlu`) |
+| GPU | — | Not used. The 2-D problem is too small to benefit, and SciPy's sparse direct solver runs on the CPU |
+
+Example commands:
+
+```bash
+pip install pypardiso
+python run_sc_fem.py --mesh fine --out results_fine
+python sweep_design.py --param gap --values 0.045 0.05 0.055 0.06 0.065 0.07 0.075 --jobs 7
+```
 
 ## Limitations
 
@@ -68,5 +89,13 @@ the line-to-line voltage.
 * แรงบิดเทียบกับมุมกระแส
 * แบบภาพตัดขวาง stator/rotor พร้อมขนาด (รันเฉพาะรูปนี้ได้ด้วย `python draw_cross_section.py`)
 * การประมาณค่ากำลังสูญเสีย
+* ตารางสรุปพารามิเตอร์สำคัญ (`results/08_design_summary.png`)
+
+**ตั้งค่าสำหรับเครื่อง Core Ultra 7 265K / RAM 32 GB / RTX 4060:**
+
+1. ติดตั้ง `pip install pypardiso` เพื่อให้ตัวแก้สมการทำงานหลายเธรดและเร็วขึ้น
+2. ใช้ `--mesh fine` เมื่อต้องการผลละเอียด
+3. ใช้ `--jobs 6` ถึง `8` เมื่อรัน sweep
+4. GPU ไม่ถูกใช้ เพราะปัญหา 2 มิติขนาดนี้ไม่ได้ประโยชน์จาก GPU
 
 หากต้องการเปลี่ยนขนาดเครื่อง ให้แก้ค่าใน `SCDesign` (ไฟล์ `sc_fem2d/machine.py`)

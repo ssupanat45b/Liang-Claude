@@ -69,8 +69,9 @@ class SCDesign:
     ke: float = 1.9e-4            # W/kg/(T^2 Hz^2) eddy current
     build_factor: float = 1.5
     rho_fe: float = 7650.0
-    # ---- mesh density -----------------------------------------------
+    # ---- mesh density (see MESH_PRESETS / apply_mesh_preset) ----------
     gap_layers: int = 6
+    radial_refine: int = 1        # multiplies the number of radial rings in slots/yoke
 
     # derived ---------------------------------------------------------
     @property
@@ -124,6 +125,22 @@ class SCDesign:
             raise ValueError("n_theta must be a multiple of the rotor slot pitches")
         if (self.n_theta // self.Qr_pitches) % 2:
             raise ValueError("divisions per rotor slot pitch must be even")
+
+
+# Mesh presets: angular divisions per stator slot pitch / rotor slot share, gap layers,
+# radial refinement.  Geometry (slot/pitch ratios) is identical for every preset.
+MESH_PRESETS = {
+    #           div_per_slot slot_divs rotor_slot_divs gap_layers radial_refine
+    "coarse": (8, 4, 6, 4, 1),     #  ~20k elements  (quick checks, sweeps)
+    "normal": (8, 4, 6, 6, 1),     #  ~22k elements  (default)
+    "fine":   (16, 8, 12, 8, 2),   #  ~74k elements
+    "ultra":  (24, 12, 18, 12, 3), # ~162k elements  (mesh-convergence check)
+}
+
+
+def apply_mesh_preset(d: "SCDesign", name: str) -> "SCDesign":
+    d.div_per_slot, d.slot_divs, d.rotor_slot_divs, d.gap_layers, d.radial_refine = MESH_PRESETS[name]
+    return d
 
 
 # ---------------------------------------------------------------------------
@@ -237,7 +254,9 @@ def build_mesh(d: SCDesign) -> Mesh:
         inner.append(nn)
     inner = inner[::-1]                        # e.g. 24, 48, 96, 192
     r_inner = list(np.linspace(0, r_sb, len(inner) + 2)[1:-1])
-    rotor_r = r_inner + list(np.linspace(r_sb, r_wb, 6)) + [r_wb + 0.5 * d.r_wedge, d.R_rotor]
+    rf = max(1, int(d.radial_refine))
+    rotor_r = r_inner + list(np.linspace(r_sb, r_wb, 5 * rf + 1)) \
+        + list(np.linspace(r_wb, d.R_rotor, rf + 2)[1:])
     gl = d.gap_layers // 2
     rotor_r += list(np.linspace(d.R_rotor, d.R_slide, gl + 1)[1:])
     rotor_n = inner + [n] * (len(rotor_r) - len(inner))
@@ -248,8 +267,8 @@ def build_mesh(d: SCDesign) -> Mesh:
     s2 = s1 + d.s_layer
     s3 = s2 + d.s_layer
     stator_r = list(np.linspace(d.R_slide, d.R_bore, gl + 1)) + [d.R_bore + 0.5 * d.s_wedge] \
-        + list(np.linspace(s1, s2, 4)) + list(np.linspace(s2, s3, 4)[1:]) \
-        + list(np.geomspace(s3, d.R_stator_out, 7)[1:])
+        + list(np.linspace(s1, s2, 3 * rf + 1)) + list(np.linspace(s2, s3, 3 * rf + 1)[1:]) \
+        + list(np.geomspace(s3, d.R_stator_out, 6 * rf + 1)[1:])
     stator_r = sorted(set(np.round(stator_r, 9)))
     s_xy, s_tri, s_rings = _build_part(stator_r, [n] * len(stator_r), center=False)
 
