@@ -147,21 +147,23 @@ msg("materials")
 
 # ---------------------------------------------------------------- stator + coils
 circle("Stator", D["R_out"], MAT_STATOR, "(160 170 190)")
-circle("Bore_tmp", D["R_bore"])
-slots = [polygon("Slot_%%02d" %% (k + 1), s) for k, s in enumerate(D["slots"])]
-subtract("Stator", ["Bore_tmp"] + slots)
+polygon("StatorHole_tmp", D["stator_hole"])
+subtract("Stator", ["StatorHole_tmp"])
 colors = {"A": "(220 60 50)", "B": "(240 200 40)", "C": "(50 120 200)"}
-for c in D["coils"]:
-    polygon(c["name"], c["poly"], "copper", colors[c["phase"]])
+coil_names = [polygon(c["name"], c["poly"], "copper", colors[c["phase"]]) for c in D["coils"]]
+# the slots are cut with the coil objects themselves (kept) -> coil edges == slot edges exactly
+oEditor.Subtract(["NAME:Selections", "Blank Parts:=", "Stator", "Tool Parts:=", ",".join(coil_names)],
+                 ["NAME:SubtractParameters", "KeepOriginals:=", True])
 msg("stator and %%d coil sides" %% len(D["coils"]))
 
 # ---------------------------------------------------------------- rotor + magnets
 circle("Rotor", D["R_rotor"], MAT_ROTOR, "(130 140 160)")
-tools = [polygon(b["name"], b["poly"]) for b in D["barriers"]]
-tools += [polygon("Pocket_" + m["name"], m["poly"]) for m in D["magnets"]]
-subtract("Rotor", tools)
+subtract("Rotor", [polygon(b["name"], b["poly"]) for b in D["barriers"]])
+mag_names = [polygon(m["name"], m["poly"], "NdFeB_N38SH_80C", "(200 30 90)" if m["north"] else "(30 100 200)")
+             for m in D["magnets"]]
+oEditor.Subtract(["NAME:Selections", "Blank Parts:=", "Rotor", "Tool Parts:=", ",".join(mag_names)],
+                 ["NAME:SubtractParameters", "KeepOriginals:=", True])
 for m in D["magnets"]:
-    polygon(m["name"], m["poly"], "NdFeB_N38SH_80C", "(200 30 90)" if m["north"] else "(30 100 200)")
     a = math.radians(m["mag_deg"])
     cs = "CS_" + m["name"]
     oEditor.CreateRelativeCS(["NAME:RelativeCSParameters", "Mode:=", "Axis/Position",
@@ -278,7 +280,7 @@ def export(d, G, ref, out_dir, load):
         bh_stator=hb(STATOR_LAMINATION), bh_rotor=hb(ROTOR_FORGING),
         mu_rm=d.mu_rm, Hc=_r(d.Br() / (MU0 * d.mu_rm), 1),
         R_out=_r(G["R_out"]), R_bore=_r(G["R_bore"]), R_rotor=_r(G["R_rotor"]), R_band=_r(G["R_band"]),
-        slots=[[(_r(x), _r(y)) for x, y in s] for s in G["slots"]],
+        stator_hole=[(_r(x), _r(y)) for x, y in G["stator_hole"]],
         coils=[dict(name=c["name"], phase=c["phase"], sign=int(c["sign"]),
                     poly=[(_r(x), _r(y)) for x, y in c["poly"]]) for c in G["coils"]],
         barriers=[dict(name=b["name"], poly=[(_r(x), _r(y)) for x, y in b["poly"]]) for b in G["barriers"]],

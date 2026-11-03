@@ -87,7 +87,7 @@ def sector(r_in, r_out, a0, a1, step_deg=0.5):
     return inner + outer
 
 
-COIL_CLEAR_MM = 0.1
+COIL_CLEAR_MM = 0.0   # coils fill the slot exactly; the stator hole is cut with the coil objects
 
 
 def geometry_mm(d):
@@ -105,10 +105,8 @@ def geometry_mm(d):
         slots.append(sector(g["R_bore"] * mm, g["s3"] * mm, a0, a1))
         for layer, (r0, r1) in enumerate(((g["s1"], g["s2"]), (g["s2"], g["s3"]))):
             ph, sg = lay[layer][k]
-            # 0.1 mm clearance to the slot walls and between the layers (slot liner), so that the
-            # coils never touch/intersect the stator iron in AEDT (coincident edges + rounding)
             c_r0, c_r1 = r0 * mm + COIL_CLEAR_MM, r1 * mm - COIL_CLEAR_MM
-            da = math.degrees(COIL_CLEAR_MM / c_r0)
+            da = math.degrees(COIL_CLEAR_MM / c_r0) if COIL_CLEAR_MM else 0.0
             coils.append(dict(name=f"Coil_{'ABC'[ph]}_{k + 1:02d}_{'top' if layer == 0 else 'bot'}",
                               phase="ABC"[ph], sign=sg, poly=sector(c_r0, c_r1, a0 + da, a1 - da)))
     magnets, barriers = [], []
@@ -118,7 +116,35 @@ def geometry_mm(d):
                             axis_deg=360.0 * k / d.poles, north=(k % 2 == 0)))
         for j, b in enumerate((bu, bl)):
             barriers.append(dict(name=f"Barrier_{k + 1}{'ab'[j]}", poly=[(x * mm, y * mm) for x, y in b]))
-    return dict(R_out=d.R_stator_out * mm, R_bore=d.R_bore * mm, R_rotor=d.R_rotor * mm,
+    # stator hole = air-gap side of the stator: tooth-tip arcs at the bore + slot openings up to the
+    # coil top edge (same vertices as the coils -> exactly coincident edges in AEDT)
+    hole = []
+    for k in range(d.Qs):
+        a0 = k * g["s_pitch_deg"] + g["s_slot_start"]
+        a1 = a0 + g["s_slot_deg"]
+        n = max(2, int(math.ceil(abs(a1 - a0) / 0.5)) + 1)
+        t = np.radians(np.linspace(a0, a1, n))
+        r1 = g["s1"] * mm
+        hole.append((g["R_bore"] * mm * math.cos(t[0]), g["R_bore"] * mm * math.sin(t[0])))
+        hole += [(r1 * math.cos(x), r1 * math.sin(x)) for x in t]
+        hole.append((g["R_bore"] * mm * math.cos(t[-1]), g["R_bore"] * mm * math.sin(t[-1])))
+        b0, b1 = a1, a0 + g["s_pitch_deg"]                   # tooth tip to the next slot
+        m = max(2, int(math.ceil((b1 - b0) / 0.5)) + 1)
+        hole += [(g["R_bore"] * mm * math.cos(x), g["R_bore"] * mm * math.sin(x))
+                 for x in np.radians(np.linspace(b0, b1, m))[1:-1]]
+    # rotor polygons: snap vertices that are (numerically) the same point to one coordinate
+    seen = []
+    def snap(pt):
+        for q in seen:
+            if abs(q[0] - pt[0]) < 1e-3 and abs(q[1] - pt[1]) < 1e-3:
+                return q
+        seen.append(pt)
+        return pt
+    for m_ in magnets:
+        m_["poly"] = [snap(p) for p in m_["poly"]]
+    for b_ in barriers:
+        b_["poly"] = [snap(p) for p in b_["poly"]]
+    return dict(R_out=d.R_stator_out * mm, R_bore=d.R_bore * mm, R_rotor=d.R_rotor * mm, stator_hole=hole,
                 R_band=(d.R_rotor + 0.5 * d.gap) * mm, slots=slots, coils=coils,
                 magnets=magnets, barriers=barriers)
 
