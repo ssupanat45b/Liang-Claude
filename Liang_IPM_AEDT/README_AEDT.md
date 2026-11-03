@@ -21,6 +21,26 @@ python build_aedt.py --version 2024.2 --solve   # ระบุเวอร์ช
   ไม่มีก็ใช้ BO compromise (`../Liang_IPM_BO/results/pareto.csv`) และสุดท้ายคือค่าตั้งต้นในโค้ด
 * ให้วางโฟลเดอร์นี้ข้าง ๆ `Liang_IPM_MagGap` / `Liang_IPM_BO` เพื่อให้หาผล optimisation เจอ
 
+## ⚠ ถ้า AEDT ขึ้น "File not found: ...\Liang_IPM_AEDT\51032" (ตัวเลขใด ๆ)
+PyAEDT 1.x เปิด AEDT ด้วยคำสั่ง `ansysedt.exe -grpcsrv <port>` ถ้า AEDT เวอร์ชันนั้นไม่รู้จัก
+argument นี้ (เวอร์ชันก่อน 2022 R2, Student บางรุ่น หรือ service pack ไม่ตรงกับ PyAEDT) จะมองตัวเลข
+port เป็นชื่อไฟล์ → ให้ใช้ **native script** แทน (ไม่ต้องใช้ PyAEDT, ใช้ได้ทุกเวอร์ชัน)
+
+1. ปิด dialog / ปิด AEDT ที่ค้าง แล้วรัน
+   ```
+   python build_aedt.py --script-only                 # rated load
+   python build_aedt.py --script-only --load noload   # แม่เหล็กอย่างเดียว
+   ```
+   ได้ไฟล์ `aedt_model\IPM_SynCon_aedt_script_rated.py` (และ `_noload.py`)
+2. เปิด ANSYS Electronics Desktop เอง → **Tools ▸ Run Script...** → เลือกไฟล์ข้างบน
+   (ถ้าถามชนิด script เลือก IronPython/Python) ดูความคืบหน้าในหน้าต่าง Message Manager
+3. สคริปต์บันทึกโปรเจกต์ `aedt_model\IPM_SynCon_300kVAr_<load>_native.aedt`
+   แล้วกด **Validate (F7)** → **Analyze All**
+
+native script สร้างทุกอย่างเหมือน PyAEDT (วัสดุ B-H, สเตเตอร์/ขดลวด 72 ชิ้น, โรเตอร์ + barrier,
+แม่เหล็ก 4 ก้อนพร้อม CS, band 1500 rpm, A=0, winding/coil, mesh, transient setup, report)
+ถ้าขั้นใดใน script error ให้ส่งข้อความใน Message Manager มา
+
 ## สิ่งที่สร้างในโปรเจกต์ `aedt_model/IPM_SynCon_300kVAr_<load>.aedt`
 | ส่วน | รายละเอียด |
 |---|---|

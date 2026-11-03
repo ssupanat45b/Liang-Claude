@@ -174,8 +174,15 @@ def build(d, G, ref, args):
 
     load = args.load
     proj = os.path.abspath(os.path.join(args.out, f"IPM_SynCon_300kVAr_{load}.aedt"))
-    m2d = Maxwell2d(project=proj, design=f"IPM_{d.poles}p_{load}", solution_type="TransientXY",
-                    version=args.version, non_graphical=args.non_graphical, new_desktop=True)
+    try:
+        m2d = Maxwell2d(project=proj, design=f"IPM_{d.poles}p_{load}", solution_type="TransientXY",
+                        version=args.version, non_graphical=args.non_graphical, new_desktop=True)
+    except Exception as e:                                  # noqa: BLE001
+        raise SystemExit(
+            f"PyAEDT could not start/connect to AEDT ({type(e).__name__}: {e}).\n"
+            "If AEDT showed 'File not found: ...\\<number>', this AEDT version does not accept the gRPC\n"
+            "start-up argument of this PyAEDT. Use the native script instead (no PyAEDT needed):\n"
+            f"   AEDT > Tools > Run Script... > {os.path.abspath(args.out)}\\IPM_SynCon_aedt_script_{load}.py")
     m2d.modeler.model_units = "mm"
     m2d.model_depth = f"{d.L_stack * 1e3:.3f}mm"
 
@@ -260,7 +267,7 @@ def build(d, G, ref, args):
     # ---- torque on the rotor ----------------------------------------------------------------
     try:
         m2d.assign_torque(assignment=[rotor.name] + [o.name for o in mag_objs], is_positive=True,
-                          is_virtual=True, name="Torque_rotor")
+                          is_virtual=True, torque_name="Torque_rotor")
     except Exception as e:                                  # noqa: BLE001  (motion also reports torque)
         print("   torque parameter skipped:", e)
 
@@ -316,6 +323,8 @@ def main():
     ap.add_argument("--solve", action="store_true", help="also run the transient solution")
     ap.add_argument("--keep-open", action="store_true")
     ap.add_argument("--preview-only", action="store_true", help="only write the geometry preview + expected values")
+    ap.add_argument("--script-only", action="store_true",
+                    help="only write the native AEDT script (use when PyAEDT cannot start AEDT)")
     ap.add_argument("--out", default="aedt_model")
     a = ap.parse_args()
     os.makedirs(a.out, exist_ok=True)
@@ -338,7 +347,10 @@ def main():
     with open(os.path.join(a.out, "aedt_expected.json"), "w") as fh:
         json.dump(ref, fh, indent=1)
     print(json.dumps(ref["expected"], indent=1))
-    if a.preview_only:
+    import aedt_native
+    sp = aedt_native.export(d, G, ref, a.out, a.load)
+    print("native AEDT script (no PyAEDT needed, run in AEDT: Tools > Run Script):", os.path.abspath(sp))
+    if a.preview_only or a.script_only:
         return
     build(d, G, ref, a)
 
