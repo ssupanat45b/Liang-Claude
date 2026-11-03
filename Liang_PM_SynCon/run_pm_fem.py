@@ -150,6 +150,8 @@ def main():
     a = ap.parse_args()
 
     backend = solver.set_backend(a.solver)
+    if solver.gpu_help():
+        print(solver.gpu_help())
     d = apply_mesh_preset(design_preset(a.design), a.mesh)
     a.out = a.out or f"results_{a.design}"
     if a.Q:

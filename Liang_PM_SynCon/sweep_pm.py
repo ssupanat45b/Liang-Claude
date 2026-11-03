@@ -66,6 +66,8 @@ def main():
         a.values = [0.016, 0.019, 0.022, 0.025, 0.028]
     from pm_fem2d import solver
     use_gpu = solver.set_backend(a.solver).startswith("GPU")
+    if solver.gpu_help():
+        print(solver.gpu_help())
     jobs = a.jobs or (min(2, len(a.values)) if use_gpu else max(1, min(len(a.values), (os.cpu_count() or 2) // 2)))
     if jobs > 1 and not use_gpu:
         for v in ("OMP_NUM_THREADS", "MKL_NUM_THREADS", "OPENBLAS_NUM_THREADS"):

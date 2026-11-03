@@ -33,6 +33,9 @@ def main():
     a = ap.parse_args()
     backs = available()
     print("available backends:", backs)
+    if "gpu" not in backs and solver._state["gpu_error"]:
+        solver._state["backend"] = "superlu"
+        print(solver.gpu_help())
     rows = []
     for mesh in a.mesh:
         d = apply_mesh_preset(design_preset(), mesh)

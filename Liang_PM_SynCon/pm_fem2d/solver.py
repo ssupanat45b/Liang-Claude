@@ -31,7 +31,7 @@ import warnings
 # Any GPU failure (no device, out of memory, CG not converged) falls back to the CPU.
 # ---------------------------------------------------------------------------
 _state = {"backend": None, "cp": None, "csp": None, "cspl": None, "pardiso": None,
-          "gpu_name": "", "fallbacks": 0, "cg_iters": 0}
+          "gpu_name": "", "gpu_error": "", "fallbacks": 0, "cg_iters": 0}
 
 
 def _try_gpu():
@@ -40,13 +40,30 @@ def _try_gpu():
         import cupyx.scipy.sparse as csp
         import cupyx.scipy.sparse.linalg as cspl
         if cp.cuda.runtime.getDeviceCount() < 1:
+            _state["gpu_error"] = "no CUDA device found"
             return False
         props = cp.cuda.runtime.getDeviceProperties(0)
         name = props["name"].decode() if isinstance(props["name"], bytes) else str(props["name"])
-        _state.update(cp=cp, csp=csp, cspl=cspl, gpu_name=name)
+        # smoke test: a real sparse kernel (fails here if the CUDA libraries cannot be loaded)
+        csp.identity(4, format="csr").dot(cp.ones(4))
+        _state.update(cp=cp, csp=csp, cspl=cspl, gpu_name=name, gpu_error="")
         return True
-    except Exception:                                       # noqa: BLE001
+    except ImportError as e:
+        _state["gpu_error"] = f"CuPy not installed ({e})"
         return False
+    except Exception as e:                                  # noqa: BLE001
+        _state["gpu_error"] = f"{type(e).__name__}: {e}"
+        return False
+
+
+def gpu_help() -> str:
+    """Why the GPU is not used, and how to fix it ('' if the GPU is active)."""
+    if _state["backend"] == "gpu" or not _state["gpu_error"]:
+        return ""
+    return ("GPU not used -> " + _state["gpu_error"] + "\n"
+            "  fix: pip install \"cupy-cuda12x[ctk]\"   (adds the CUDA 12 runtime libraries)\n"
+            "       or install the CUDA Toolkit 12.x and set CUDA_PATH; update the NVIDIA driver;\n"
+            "  test: python -c \"import cupy; print(cupy.cuda.runtime.getDeviceCount(), cupy.arange(3) * 2)\"")
 
 
 def _try_pardiso():
