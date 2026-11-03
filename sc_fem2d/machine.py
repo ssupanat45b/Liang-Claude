@@ -59,6 +59,7 @@ class SCDesign:
     Nf_per_slot: int = 10         # field turns per rotor slot
     # ---- extra (3-D) effects not captured by the 2-D model -----------
     X_end_pu: float = 0.06        # end-winding leakage reactance [pu]
+    skew_slots: float = 0.0       # stator skew in stator slot pitches (applied analytically)
     # ---- loss data --------------------------------------------------
     rho_cu: float = 2.1e-8        # ohm m at ~75 C
     fill_arm: float = 0.55        # copper fill of armature layer
@@ -70,10 +71,19 @@ class SCDesign:
     build_factor: float = 1.5
     rho_fe: float = 7650.0
     # ---- mesh density (see MESH_PRESETS / apply_mesh_preset) ----------
-    gap_layers: int = 6
+    gap_layers: int = 12
     radial_refine: int = 1        # multiplies the number of radial rings in slots/yoke
 
     # derived ---------------------------------------------------------
+    @property
+    def pp(self) -> int:
+        """Pole pairs."""
+        return self.poles // 2
+
+    @property
+    def wound_rotor_slots(self) -> int:
+        return self.Qr_pitches - self.poles * self.Qr_omit_per_pole
+
     @property
     def n_theta(self) -> int:
         return self.Qs * self.div_per_slot
@@ -111,6 +121,13 @@ class SCDesign:
         # double layer: Qs coils, Qs/3 coils per phase
         return self.Qs / 3 * self.turns_per_coil / self.parallel_paths
 
+    def skew_factor(self, nu=1):
+        """Skew factor for EMF harmonic ``nu`` (electrical order); 1 for an unskewed core."""
+        a = self.skew_slots * 2 * math.pi * self.pp / self.Qs * np.asarray(nu, float) / 2
+        with np.errstate(invalid="ignore", divide="ignore"):
+            k = np.where(np.abs(a) < 1e-12, 1.0, np.sin(a) / np.where(a == 0, 1, a))
+        return k if np.ndim(k) else float(k)
+
     def winding_factor(self) -> float:
         q = self.Qs / (3 * self.poles)
         alpha = math.pi * self.poles / self.Qs
@@ -119,8 +136,12 @@ class SCDesign:
         return kd * kp
 
     def check(self):
-        if self.poles != 2:
-            raise NotImplementedError("the example layout generator handles 2-pole machines")
+        if self.poles % 2 or self.poles < 2:
+            raise ValueError("poles must be an even number")
+        if self.Qs % (3 * self.poles):
+            raise ValueError("Qs must be a multiple of 3*poles (integer slots per pole and phase)")
+        if self.Qr_pitches % self.poles or (self.Qr_pitches // self.poles - self.Qr_omit_per_pole) % 2:
+            raise ValueError("rotor: Qr_pitches/poles - Qr_omit_per_pole must be a positive even number")
         if self.n_theta % self.Qr_pitches:
             raise ValueError("n_theta must be a multiple of the rotor slot pitches")
         if (self.n_theta // self.Qr_pitches) % 2:
@@ -131,10 +152,11 @@ class SCDesign:
 # radial refinement.  Geometry (slot/pitch ratios) is identical for every preset.
 MESH_PRESETS = {
     #           div_per_slot slot_divs rotor_slot_divs gap_layers radial_refine
-    "coarse": (8, 4, 6, 4, 1),     #  ~20k elements  (quick checks, sweeps)
-    "normal": (8, 4, 6, 6, 1),     #  ~22k elements  (default)
-    "fine":   (16, 8, 12, 8, 2),   #  ~74k elements
-    "ultra":  (24, 12, 18, 12, 3), # ~162k elements  (mesh-convergence check)
+    # air-gap layers: Arkkio torque error ~ +6 % / +2.7 % / +1 % for 6 / 12 / 24 layers
+    "coarse": (8, 4, 6, 6, 1),
+    "normal": (8, 4, 6, 12, 1),
+    "fine":   (16, 8, 12, 24, 2),
+    "ultra":  (24, 12, 18, 32, 3),
 }
 
 
@@ -290,8 +312,8 @@ def build_mesh(d: SCDesign) -> Mesh:
     in_slot = (pos >= lo) & (pos < lo + d.rotor_slot_divs)
     centre = (pitch + 0.5) * 2 * np.pi / d.Qr_pitches
     half_pole = d.Qr_omit_per_pole / 2 * 2 * np.pi / d.Qr_pitches
-    ang_to_pole = np.minimum(np.abs((centre + np.pi) % (2 * np.pi) - np.pi),
-                             np.abs(((centre - np.pi) + np.pi) % (2 * np.pi) - np.pi))
+    pole_pitch = 2 * np.pi / d.poles             # poles centred at k * pole_pitch (d-axis at 0)
+    ang_to_pole = np.abs((centre + pole_pitch / 2) % pole_pitch - pole_pitch / 2)
     wound = ang_to_pole > half_pole
     slot_zone = in_slot & wound & (rr > r_sb) & (rr < d.R_rotor)
     r_reg[slot_zone & (rr < r_wb)] = FIELD_COIL
@@ -337,6 +359,39 @@ def winding_layout(d: SCDesign):
 
 
 def field_sign(d: SCDesign, pitch_idx: np.ndarray) -> np.ndarray:
-    """+1 for rotor slots in the upper half (0..pi), -1 in the lower half."""
-    centre = (pitch_idx + 0.5) * 2 * np.pi / d.Qr_pitches
-    return np.where(centre < np.pi, 1.0, -1.0)
+    """+1 for rotor slots at electrical angle 0..pi, -1 for pi..2pi (d-axis of pole 1 at 0)."""
+    centre_el = d.pp * (np.asarray(pitch_idx) + 0.5) * 2 * np.pi / d.Qr_pitches
+    return np.where(np.mod(centre_el, 2 * np.pi) < np.pi, 1.0, -1.0)
+
+
+# ---------------------------------------------------------------------------
+def design_preset(name: str = "factory300") -> SCDesign:
+    """Ready-made designs.
+
+    sc100      : 100 MVAr, 13.8 kV, 2-pole 3000 rpm transmission-grid condenser (original example)
+    factory300 : 300 kVAr, 0.4 kV, 4-pole 1500 rpm low-voltage factory condenser
+    """
+    if name == "sc100":
+        return SCDesign()
+    if name == "factory300":
+        return SCDesign(
+            S_rated=300e3, V_line=400.0, f=50.0, poles=4,
+            L_stack=0.45, R_rotor=0.197, gap=0.003, R_stator_out=0.300,
+            Qs=48, div_per_slot=8, slot_divs=4, s_wedge=0.003, s_layer=0.018,
+            coil_pitch=10, parallel_paths=2, turns_per_coil=2,
+            Qr_pitches=32, Qr_omit_per_pole=2, r_wedge=0.004, r_slot_depth=0.048,
+            rotor_slot_divs=6, Nf_per_slot=40,
+            X_end_pu=0.06, skew_slots=1.0, fill_arm=0.45, fill_field=0.55, end_arm=0.30, end_field=0.25)
+    raise KeyError(f"unknown design preset '{name}' (use sc100 or factory300)")
+
+
+DESIGN_PRESETS = ("factory300", "sc100")
+
+
+def fmt_q(kvar: float) -> str:
+    """Format reactive power given in kVAr."""
+    return f"{kvar / 1e3:.1f} MVAr" if abs(kvar) >= 1000 else f"{kvar:.0f} kVAr"
+
+
+def fmt_v(volts: float) -> str:
+    return f"{volts / 1e3:g} kV" if volts >= 1000 else f"{volts:.0f} V"

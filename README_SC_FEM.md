@@ -3,22 +3,30 @@
 A self-contained Python FEM model of the cross-section of a round-rotor
 synchronous condenser. It needs only numpy, scipy, and matplotlib.
 
-**Example rating:** 100 MVAr, 13.8 kV, 50 Hz, 2-pole, 3000 rpm.
+Two design presets are included (`--design`):
+
+| Preset | Rating | Poles / speed | Use |
+|---|---|---|---|
+| `factory300` (default) | 300 kVAr, 400 V, 50 Hz | 4-pole, 1500 rpm | low-voltage factory power-factor / voltage support |
+| `sc100` | 100 MVAr, 13.8 kV, 50 Hz | 2-pole, 3000 rpm | transmission-grid condenser (original example) |
+
+Results go to `results_factory300/` and `results/` respectively.
 
 ## Quick start
 
 ```bash
 pip install -r requirements.txt
-python run_sc_fem.py              # full study, about 1–2 min
+python run_sc_fem.py              # full study of the default design (about 3–5 min)
 python run_sc_fem.py --quick      # coarser sweeps
-python run_sc_fem.py --S 160 --V 15.75 --length 3.4 --out results_160
+python run_sc_fem.py --design sc100      # 100 MVAr example
+python run_sc_fem.py --Q 400              # factory design re-rated to 400 kVAr
 python -m unittest discover -s tests -v
 python draw_cross_section.py      # dimensioned stator/rotor drawing only, about 2 s
-python sweep_design.py            # design sweep (default: air gap 50/60/70 mm)
+python sweep_design.py            # design sweep (factory300: air gap 2.5–4 mm)
 python femm_compare.py            # cross-check against FEMM 4.2 (Windows, needs pyfemm)
 ```
 
-The run writes `results/report.md`, `results/results.json`, and seven figures.
+The run writes `report.md`, `results.json` and nine figures (00–08) to the results folder.
 
 ## What it computes
 
@@ -68,9 +76,11 @@ python sweep_design.py --param gap --values 0.045 0.05 0.055 0.06 0.065 0.07 0.0
 ## Limitations
 
 The model is 2-D and magnetostatic: it has no eddy currents and no end-region field.
-Slots are drawn as annular sectors, and the layout generator handles 2-pole
-machines only. The phase EMF contains a 3rd harmonic (about 3.7%), which cancels in
-the line-to-line voltage.
+Slots are drawn as annular sectors. Any even pole count works with an integer-slot,
+double-layer winding. The rotor is a round (cylindrical) rotor with a distributed
+field winding; salient-pole rotors are not modelled. Stator skew (`skew_slots`) is
+applied analytically to the EMF harmonics and the fundamental linkage. The phase EMF
+contains a 3rd harmonic, which cancels in the line-to-line voltage.
 
 ---
 
@@ -98,4 +108,12 @@ the line-to-line voltage.
 3. ใช้ `--jobs 6` ถึง `8` เมื่อรัน sweep
 4. GPU ไม่ถูกใช้ เพราะปัญหา 2 มิติขนาดนี้ไม่ได้ประโยชน์จาก GPU
 
-หากต้องการเปลี่ยนขนาดเครื่อง ให้แก้ค่าใน `SCDesign` (ไฟล์ `sc_fem2d/machine.py`)
+**แบบสำหรับโรงงาน (`factory300`, ค่าเริ่มต้น):** 300 kVAr, 400 V, 4 ขั้ว, 1500 rpm
+
+* Ø สเตเตอร์นอก 600 mm, Ø รูเจาะ 400 mm, air gap 3 mm, แกนยาว 450 mm
+* stator 48 ร่อง, เอียงร่อง (skew) 1 ร่อง
+* ผลอยู่ในโฟลเดอร์ `results_factory300/`
+
+**แบบเดิม:** ใช้ `--design sc100` (100 MVAr, 13.8 kV)
+
+หากต้องการเปลี่ยนขนาดเครื่อง ให้แก้ค่าในฟังก์ชัน `design_preset()` (ไฟล์ `sc_fem2d/machine.py`)

@@ -4,7 +4,8 @@
 Each case is an independent FEM study, so cases run in parallel processes.
 
 Examples
-    python sweep_design.py                                   # air gap 50/60/70 mm
+    python sweep_design.py                                   # factory300: air gap 2.5/3/3.5/4 mm
+    python sweep_design.py --design sc100                    # 100 MVAr: air gap 50/60/70 mm
     python sweep_design.py --param gap --values 0.045 0.05 0.055 0.06 0.065 0.07 --jobs 6
     python sweep_design.py --param L_stack --values 2.6 2.9 3.2
     python sweep_design.py --param Nf_per_slot --values 8 10 12 --mesh fine
@@ -24,12 +25,12 @@ import time
 
 
 def run_case(args):
-    param, value, mesh, keep_rotor = args
+    param, value, mesh, keep_rotor, design = args
     import numpy as np
     from sc_fem2d.analysis import SCAnalysis
-    from sc_fem2d.machine import SCDesign, apply_mesh_preset
+    from sc_fem2d.machine import apply_mesh_preset, design_preset
 
-    d = apply_mesh_preset(SCDesign(), mesh)
+    d = apply_mesh_preset(design_preset(design), mesh)
     base_bore = d.R_bore
     cur = getattr(d, param)
     setattr(d, param, type(cur)(value))
@@ -51,32 +52,39 @@ def run_case(args):
         param=param, value=value, R_rotor_mm=d.R_rotor * 1e3, gap_mm=d.gap * 1e3,
         If0_A=o["If_noload"], sat_factor=o["saturation_factor"], B_gap1_T=g["B1"],
         Xd_pu=p["Xd_pu"], Xq_pu=p["Xq_pu"], SCR=p["SCR"], If_sc_A=p["If_sc"],
-        If_rated_A=r["If_rated_over"], Q_under_If0_MVAr=r["Q_under_If0_MVAr"],
-        Q_under_pct=-r["Q_under_If0_MVAr"] / (d.S_rated / 1e6) * 100,
-        P_field_kW=L["P_field_cu_kW"], U_field_V=L["V_field_rated"], J_field_A_mm2=L["J_field_A_mm2"],
+        If_rated_A=r["If_rated_over"], Q_under_If0_kVAr=r["Q_under_If0_kVAr"],
+        Q_under_pct=-r["Q_under_If0_kVAr"] / (d.S_rated / 1e3) * 100,
+        P_field_kW=L["P_field_cu_kW"], P_total_kW=L["P_total_kW"], J_arm_A_mm2=L["J_arm_A_mm2"], U_field_V=L["V_field_rated"], J_field_A_mm2=L["J_field_A_mm2"],
         B_tooth_max_T=summ["B_stator_tooth_max"], B_yoke_max_T=summ["B_stator_yoke_max"],
         B_rotor_body_max_T=summ["B_rotor_body_max"],
         runtime_s=time.time() - t0)
 
 
-COLUMNS = [("value", "{:g}"), ("R_rotor_mm", "{:.0f}"), ("gap_mm", "{:.0f}"), ("If0_A", "{:.0f}"),
-           ("If_sc_A", "{:.0f}"), ("If_rated_A", "{:.0f}"), ("Xd_pu", "{:.3f}"), ("Xq_pu", "{:.3f}"),
-           ("SCR", "{:.3f}"), ("Q_under_If0_MVAr", "{:.1f}"), ("Q_under_pct", "{:.0f}"),
-           ("B_gap1_T", "{:.3f}"), ("sat_factor", "{:.3f}"), ("P_field_kW", "{:.0f}"),
+COLUMNS = [("value", "{:g}"), ("R_rotor_mm", "{:.1f}"), ("gap_mm", "{:.1f}"), ("If0_A", "{:.1f}"),
+           ("If_sc_A", "{:.1f}"), ("If_rated_A", "{:.1f}"), ("Xd_pu", "{:.3f}"), ("Xq_pu", "{:.3f}"),
+           ("SCR", "{:.3f}"), ("Q_under_If0_kVAr", "{:.1f}"), ("Q_under_pct", "{:.0f}"),
+           ("B_gap1_T", "{:.3f}"), ("sat_factor", "{:.3f}"), ("P_field_kW", "{:.3g}"), ("P_total_kW", "{:.3g}"), ("J_arm_A_mm2", "{:.2f}"),
            ("U_field_V", "{:.0f}"), ("J_field_A_mm2", "{:.2f}"), ("B_tooth_max_T", "{:.2f}"),
            ("B_rotor_body_max_T", "{:.2f}")]
 
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    ap.add_argument("--design", default="factory300", choices=["factory300", "sc100"])
     ap.add_argument("--param", default="gap")
-    ap.add_argument("--values", type=float, nargs="+", default=[0.050, 0.060, 0.070])
+    ap.add_argument("--values", type=float, nargs="+", default=None,
+                    help="default for gap: factory300 2.5-4 mm, sc100 50/60/70 mm")
     ap.add_argument("--mesh", default="normal", choices=["coarse", "normal", "fine", "ultra"])
     ap.add_argument("--jobs", type=int, default=0,
                     help="parallel processes (0 = auto: min(cases, CPU cores // 2))")
     ap.add_argument("--keep-rotor", action="store_true")
-    ap.add_argument("--out", default="results_sweep")
+    ap.add_argument("--out", default=None)
     a = ap.parse_args()
+    if a.values is None:
+        if a.param != "gap":
+            ap.error("--values is required for this parameter")
+        a.values = [0.0025, 0.003, 0.0035, 0.004] if a.design == "factory300" else [0.050, 0.060, 0.070]
+    a.out = a.out or ("results_sweep" if a.design == "sc100" else f"results_sweep_{a.design}")
 
     # one BLAS/solver thread per worker so parallel cases don't oversubscribe the CPU
     jobs = a.jobs or max(1, min(len(a.values), (os.cpu_count() or 2) // 2))
@@ -89,8 +97,8 @@ def main():
     import matplotlib.pyplot as plt
 
     os.makedirs(a.out, exist_ok=True)
-    cases = [(a.param, v, a.mesh, a.keep_rotor) for v in a.values]
-    print(f"Sweeping {a.param} = {a.values}  | mesh '{a.mesh}' | {jobs} parallel job(s)")
+    cases = [(a.param, v, a.mesh, a.keep_rotor, a.design) for v in a.values]
+    print(f"Design {a.design}: sweeping {a.param} = {a.values}  | mesh '{a.mesh}' | {jobs} parallel job(s)")
     t0 = time.time()
     if jobs > 1:
         with ProcessPoolExecutor(max_workers=jobs) as ex:
@@ -110,7 +118,7 @@ def main():
     print("\n" + table)
 
     keys = [("Xd_pu", "Xd [pu]"), ("SCR", "SCR [-]"), ("If_rated_A", "If rated (+Q) [A]"),
-            ("If0_A", "If0 no-load [A]"), ("Q_under_If0_MVAr", "Q under-excited @If=0 [MVAr]"),
+            ("If0_A", "If0 no-load [A]"), ("Q_under_If0_kVAr", "Q under-excited @If=0 [kVAr]"),
             ("P_field_kW", "Field Cu loss [kW]")]
     x = [r["value"] * (1e3 if a.param == "gap" else 1) for r in rows]
     xl = "air gap [mm]" if a.param == "gap" else a.param
@@ -127,7 +135,7 @@ def main():
     fig.savefig(png, dpi=150); plt.close(fig)
 
     with open(os.path.join(a.out, f"sweep_{a.param}.md"), "w", encoding="utf-8") as fh:
-        fh.write(f"# Design sweep: {a.param}\n\nMesh preset: {a.mesh}. "
+        fh.write(f"# Design sweep ({a.design}): {a.param}\n\nMesh preset: {a.mesh}. "
                  + ("Stator bore kept fixed; rotor diameter = bore − 2·gap.\n\n"
                     if a.param == "gap" and not a.keep_rotor else "\n\n")
                  + table + f"\n\n![sweep](sweep_{a.param}.png)\n")

@@ -14,12 +14,16 @@ import numpy as np
 from scipy.optimize import brentq
 
 from . import machine as mc
+from .machine import fmt_q
 from .solver import MagnetostaticModel, Solution
 
 
-def fundamental_axis(theta, Br):
-    """Return (amplitude, axis angle) of the 1st space harmonic of Br(theta)."""
-    c = 2 * np.mean(Br * np.exp(-1j * theta))
+def fundamental_axis(theta, Br, order=1):
+    """Return (amplitude, axis angle) of space harmonic ``order`` of Br(theta).
+
+    Use ``order = pole pairs`` for the working (fundamental) wave; the angle is then
+    an *electrical* angle."""
+    c = 2 * np.mean(Br * np.exp(-1j * order * theta))
     return abs(c), float(np.angle(c))
 
 
@@ -72,7 +76,7 @@ class SCAnalysis:
         return [I_peak * math.cos(phi - t) for t in th]
 
     def theta_d(self, k=0):
-        return self.res.axes["d"] + 2 * math.pi * k / self.d.n_theta
+        return self.res.axes["d"] + self.d.pp * 2 * math.pi * k / self.d.n_theta
 
     def psi_dq(self, sol: Solution):
         td = self.theta_d(sol.k_shift)
@@ -91,14 +95,14 @@ class SCAnalysis:
         ax = {}
         sol = self.model.solve(i_f=100.0, linear_mu_r=1000.0)
         th, Br, _ = self.model.gap_flux_density(sol)
-        ax["d"] = fundamental_axis(th, Br)[1]
+        ax["d"] = fundamental_axis(th, Br, self.d.pp)[1]          # electrical angle
         # The anisotropic (slotted, salient) rotor biases a field-based measurement of the
         # phase axes, so they are taken from the angle of the conductor-current
         # distribution.  The fixed offset between "current centroid angle" and "MMF axis"
         # is calibrated on the field winding, whose axis coincides with the rotor symmetry.
         s = self.model.element_data(0)
         P = self.mesh.node_coords(0)
-        ej = np.exp(1j * np.arctan2(P[:, 1], P[:, 0]))
+        ej = np.exp(1j * self.d.pp * np.arctan2(P[:, 1], P[:, 0]))
         off = ax["d"] - np.angle(np.sum(s["c_f"] * ej))
         ax["phase"] = [float(np.angle(np.exp(1j * (np.angle(np.sum(s["c_ph"][p] * ej)) + off))))
                        for p in range(3)]
@@ -120,11 +124,18 @@ class SCAnalysis:
         E = np.array(E)
         # air-gap line from the lowest (unsaturated) point
         slope = E[1] / If_values[1]
-        If0 = float(np.interp(self.d.V_line, E, If_values))
+        # exact root E(If0) = V_rated, bracketed by the OCC points
+        i = int(np.searchsorted(E, self.d.V_line))
+        lo, hi = If_values[max(i - 1, 0)], If_values[min(i, len(If_values) - 1)]
+
+        def f(If):
+            pd, pq = self.psi_dq(self.solve(i_f=If))
+            return math.sqrt(3) * self.E_phase(math.hypot(pd, pq)) - self.d.V_line
+        If0 = float(brentq(f, lo, hi, rtol=1e-5)) if lo < hi else float(np.interp(self.d.V_line, E, If_values))
         self.res.occ = dict(If=np.asarray(If_values), E_line=E, airgap_slope=slope,
                             If_noload=If0, If_airgap=self.d.V_line / slope,
                             saturation_factor=If0 / (self.d.V_line / slope))
-        self.log(f"    no-load field current for rated voltage: If0 = {If0:.0f} A")
+        self.log(f"    no-load field current for rated voltage: If0 = {If0:.1f} A")
         return self.res.occ
 
     # -------------------------------------------------- operating points
@@ -186,16 +197,16 @@ class SCAnalysis:
         If_r, sol_over = self.field_for_point(d.I_rated, d.V_phase, If_hi=6 * If0)
         I_u = self.under_excited_limit(0.0)
         sol_under = self.solve(i_abc=self.currents(I_u * math.sqrt(2), self.theta_d()), i_f=0.0)
-        self.res.rated = dict(If_rated_over=If_r, Q_over_MVAr=d.S_rated / 1e6,
+        self.res.rated = dict(If_rated_over=If_r, Q_over_kVAr=d.S_rated / 1e3,
                               I_under_If0=I_u,
-                              Q_under_If0_MVAr=-3 * d.V_phase * I_u / 1e6,
+                              Q_under_If0_kVAr=-3 * d.V_phase * I_u / 1e3,
                               torque_over=sol_over.torque)
         self.res.solutions["rated_over"] = sol_over
         self.res.solutions["under_If0"] = sol_under
-        self.log(f"    over-excited  +{d.S_rated / 1e6:.0f} MVAr: If = {If_r:.0f} A "
+        self.log(f"    over-excited  +{fmt_q(d.S_rated / 1e3)}: If = {If_r:.1f} A "
                  f"({If_r / If0:.2f} x If0)")
         self.log(f"    under-excited at If = 0: I = {I_u:.0f} A -> Q = "
-                 f"{-3 * d.V_phase * I_u / 1e6:.1f} MVAr")
+                 f"{fmt_q(-3 * d.V_phase * I_u / 1e3)}")
         return self.res.rated
 
     def v_curve(self, n=7):
@@ -209,19 +220,22 @@ class SCAnalysis:
                 Ifs.append(self.res.occ["If_noload"]); continue
             If, _ = self.field_for_point(I, d.V_phase, If_hi=6 * self.res.occ["If_noload"])
             Ifs.append(If)
-            self.log(f"    I = {I:8.0f} A  Q = {3 * d.V_phase * I / 1e6:7.1f} MVAr  If = {If:7.0f} A")
-        self.res.vcurve = dict(I=Is, Q_MVAr=3 * d.V_phase * Is / 1e6, If=np.array(Ifs))
+            self.log(f"    I = {I:8.1f} A  Q = {fmt_q(3 * d.V_phase * I / 1e3):>12s}  If = {If:8.1f} A")
+        self.res.vcurve = dict(I=Is, Q_kVAr=3 * d.V_phase * Is / 1e3, If=np.array(Ifs))
         return self.res.vcurve
 
     # ---------------------------------------------------- rotating sweeps
-    def no_load_waveform(self, step=4):
-        """Rotate the rotor over half a revolution at If0 and record psi_A, EMF,
+    def no_load_waveform(self, step=None):
+        """Rotate the rotor over half an electrical period at If0 and record psi_A, EMF,
         torque ripple (cogging) and peak stator-element flux density."""
         self.log("[6] no-load EMF waveform (rotor rotation sweep) ...")
         d = self.d
         If0 = self.res.occ["If_noload"]
         n = d.n_theta
-        ks = np.arange(0, n // 2 + 1, step)
+        half = n // (2 * d.pp)                   # mesh divisions per half electrical period
+        if step is None:                         # >= 96 samples per half period (no slot aliasing)
+            step = max(1, half // 96)
+        ks = np.arange(0, half + 1, step)
         psiA, T = [], []
         s0 = self.model.element_data(0)
         Bmax = np.zeros(len(s0["tri"]))
@@ -232,19 +246,31 @@ class SCAnalysis:
             if k == 0:
                 self.res.solutions["no_load"] = sol
         psiA = np.array(psiA)
-        ang = 2 * np.pi * ks / n
+        ang = d.pp * 2 * np.pi * ks / n                      # electrical angle
         # half-wave symmetry: psi(theta + pi) = -psi(theta)
         ang_full = np.r_[ang[:-1], ang[:-1] + np.pi, 2 * np.pi]
         psi_full = np.r_[psiA[:-1], -psiA[:-1], psiA[0]]
-        t = ang_full / d.omega
-        e = -np.gradient(psi_full, t)
-        e_h = harmonics(ang_full[:-1], e[:-1], 25)
+        # EMF from the flux-linkage spectrum (e_n = n * omega * psi_n), exact for the sampled
+        # waveform.  Stator skew: harmonic nu is scaled by k_sk(nu)/k_sk(1) (k_sk(1) is already
+        # contained in the solver's flux linkage).
+        Psi = np.fft.rfft(psi_full[:-1])
+        nh_all = np.arange(len(Psi))
+        Psi = Psi * d.skew_factor(nh_all) / d.skew_factor(1)
+        E = -1j * nh_all * d.omega * Psi
+        e = np.fft.irfft(E, len(psi_full) - 1)
+        e = np.r_[e, e[0]]
+        nmax = min(25, len(Psi) - 1)
+        e_h = 2 * np.abs(E[:nmax + 1]) / (len(psi_full) - 1)
+        nh = np.arange(len(e_h))
         thd = math.sqrt(np.sum(e_h[2:] ** 2)) / e_h[1]
+        non_triplen = (nh >= 2) & (nh % 3 != 0)          # triplen harmonics cancel line-to-line
+        thd_line = math.sqrt(np.sum(e_h[non_triplen] ** 2)) / e_h[1]
         self.res.waveform = dict(angle=ang_full, psiA=psi_full, e=e, e_harm=e_h, thd=thd,
+                                 thd_line=thd_line,
                                  E_line_rms_fund=math.sqrt(3) * e_h[1] / math.sqrt(2),
                                  cogging=np.array(T), cogging_angle=ang, Bmax_stator=Bmax)
-        self.log(f"    EMF THD = {100 * thd:.2f} %, fundamental E_line = "
-                 f"{self.res.waveform['E_line_rms_fund'] / 1e3:.2f} kV")
+        self.log(f"    EMF THD phase {100 * thd:.2f} % / line-to-line {100 * thd_line:.2f} %, "
+                 f"fundamental E_line = {mc.fmt_v(self.res.waveform['E_line_rms_fund'])}")
         return self.res.waveform
 
     def torque_vs_angle(self, n=13):
@@ -260,7 +286,7 @@ class SCAnalysis:
         T = np.array(T)
         T_base = d.S_rated / (d.omega / (d.poles / 2))
         self.res.torque_angle = dict(gamma=gam, T=T, T_base=T_base, T_max_pu=np.abs(T).max() / T_base)
-        self.log(f"    max torque {np.abs(T).max() / 1e3:.0f} kNm = {np.abs(T).max() / T_base:.2f} pu")
+        self.log(f"    max torque {np.abs(T).max() / 1e3:.3g} kNm = {np.abs(T).max() / T_base:.2f} pu")
         return self.res.torque_angle
 
     # --------------------------------------------------------------- loss
@@ -324,8 +350,8 @@ class SCAnalysis:
         A_el = 6 * d.series_turns * d.I_rated / (math.pi * D)
         B1 = r.gap_field.get("B1") if r.gap_field else None
         if B1 is None:
-            B1 = float(fundamental_axis(*self.model.gap_flux_density(sol)[:2])[0])
-        Phi = B1 * D * d.L_stack                         # flux per pole (2-pole)
+            B1 = float(fundamental_axis(*self.model.gap_flux_density(sol)[:2], d.pp)[0])
+        Phi = 2 * B1 * D * d.L_stack / d.poles          # flux per pole
         # masses
         rho_cu, rho_st = 8900.0, 7850.0
         L = r.losses or {}
@@ -349,7 +375,7 @@ class SCAnalysis:
             mass_arm_cu_t=m_cu_a / 1e3, mass_field_cu_t=m_cu_f / 1e3,
             J_rotor_kgm2=J_rot, H_inertia_s=0.5 * J_rot * wm**2 / d.S_rated,
             A_bar_mm2=side * d.fill_arm / d.turns_per_coil * 1e6,
-            ampere_turns_rated=r.rated.get("If_rated_over", float("nan")) * len(s["slot_area"]) * d.Nf_per_slot / 2,
+            ampere_turns_pole=r.rated.get("If_rated_over", float("nan")) * len(s["slot_area"]) * d.Nf_per_slot / 2 / d.poles,
         )
         self.res.summary = out
         return out
@@ -357,14 +383,15 @@ class SCAnalysis:
     def gap_field(self):
         sol = self.res.solutions["no_load"]
         th, Br, Bt = self.model.gap_flux_density(sol)
-        h = harmonics(th, Br, 25)
+        pp = self.d.pp
+        h = harmonics(th, Br, 25 * pp)[::pp]       # index = electrical harmonic order
         self.res.gap_field = dict(theta=th, Br=Br, Bt=Bt, harm=h, B1=h[1])
         return self.res.gap_field
 
     def occ_auto(self, quick=False):
         """OCC with the If range scaled from an unsaturated air-gap-line estimate."""
-        sol = self.solve(i_f=100.0)
-        If_ag = 100.0 * self.d.V_phase / self.E_phase(self.psi_dq(sol)[0])
+        sol = self.model.solve(i_f=1.0, linear_mu_r=5000.0)     # unsaturated probe
+        If_ag = 1.0 * self.d.V_phase / self.E_phase(self.psi_dq(sol)[0])
         frac = [0.05, 0.4, 0.7, 0.9, 1.0, 1.1, 1.2, 1.35, 1.5, 1.75, 2.0]
         if quick:
             frac = [0.05, 0.5, 0.9, 1.05, 1.2, 1.5, 2.0]
@@ -373,14 +400,14 @@ class SCAnalysis:
     # ---------------------------------------------------------------- all
     def run_all(self, quick=False):
         d = self.d
-        self.log(f"Synchronous condenser {d.S_rated / 1e6:.0f} MVAr, {d.V_line / 1e3:.1f} kV, "
+        self.log(f"Synchronous condenser {fmt_q(d.S_rated / 1e3)}, {mc.fmt_v(d.V_line)}, "
                  f"{d.f:.0f} Hz, {d.rpm:.0f} rpm | mesh: {self.res.mesh_stats}")
         self.find_axes()
         self.occ_auto(quick)
         self.reactances()
         self.rated_points()
         self.v_curve(5 if quick else 7)
-        self.no_load_waveform(step=8 if quick else 4)
+        self.no_load_waveform(step=max(1, self.d.n_theta // (2 * self.d.pp) // 48) if quick else None)
         self.gap_field()
         self.torque_vs_angle(9 if quick else 13)
         self.losses()

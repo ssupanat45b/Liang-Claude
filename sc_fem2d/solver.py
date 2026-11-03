@@ -191,7 +191,8 @@ class MagnetostaticModel:
                 break
         Bx, By = self._B(s, A)
         L = self.d.L_stack
-        psi_abc = L * s["c_ph"] @ A
+        # stator skew (2-D + analytic correction): reduces the fundamental linkage by k_sk1
+        psi_abc = L * s["c_ph"] @ A * self.d.skew_factor(1)
         psi_f = L * (s["c_f"] @ A)
         return Solution(A, Bx, By, it, psi_abc, psi_f, self.torque(s, Bx, By), k_shift)
 

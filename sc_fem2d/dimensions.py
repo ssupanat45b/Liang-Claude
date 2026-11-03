@@ -14,7 +14,7 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 from matplotlib.patches import Circle, Wedge
 
-from .machine import SCDesign, winding_layout
+from .machine import SCDesign, fmt_q, fmt_v, winding_layout
 
 C_STATOR = "#b9c2cf"
 C_ROTOR = "#8c96a6"
@@ -43,8 +43,10 @@ def geometry(d: SCDesign) -> dict:
 
 
 def rotor_wound(d: SCDesign, i: int) -> bool:
+    """True if rotor slot pitch ``i`` carries field winding (poles centred at k*360/poles)."""
     centre = (i + 0.5) * 360.0 / d.Qr_pitches
-    to_pole = min(abs((centre + 180) % 360 - 180), abs(centre % 360 - 180))
+    pole_pitch = 360.0 / d.poles
+    to_pole = abs((centre + pole_pitch / 2) % pole_pitch - pole_pitch / 2)
     return to_pole > d.Qr_omit_per_pole / 2 * 360.0 / d.Qr_pitches
 
 
@@ -98,51 +100,56 @@ def plot_cross_section(d: SCDesign, path: str):
     # ---------------- A: full section with diameters ------------------
     draw_section(axA, d, labels=True)
     R = g["R_out"]
-    for r, name, y in ((g["R_rotor"], "Ø rotor", -R - 0.10), (g["R_bore"], "Ø stator bore", -R - 0.20),
-                       (g["s3"], "Ø slot bottom", -R - 0.30), (R, "Ø stator outer", -R - 0.40)):
+    for r, name, y in ((g["R_rotor"], "Ø rotor", -R * 1.09), (g["R_bore"], "Ø stator bore", -R * 1.18),
+                       (g["s3"], "Ø slot bottom", -R * 1.27), (R, "Ø stator outer", -R * 1.36)):
         for sx in (-1, 1):
-            axA.plot([sx * r, sx * r], [0, y - 0.02], color=C_DIM, lw=0.4, ls=(0, (4, 3)))
+            axA.plot([sx * r, sx * r], [0, y - 0.018 * R], color=C_DIM, lw=0.4, ls=(0, (4, 3)))
         _dim(axA, (-r, y), (r, y), f"{name} {mm(2 * r)} mm")
-    # pole / d-axis
-    axA.plot([-g["R_rotor"] * 1.05, g["R_rotor"] * 1.05], [0, 0], "k-.", lw=0.6)
-    axA.text(g["R_rotor"] * 0.55, 0.03, "d-axis (pole)", fontsize=7)
-    axA.plot([0, 0], [-g["R_rotor"] * 1.05, g["R_rotor"] * 1.05], "k:", lw=0.6)
-    axA.text(0.02, g["R_rotor"] * 0.6, "q-axis", fontsize=7, rotation=90)
-    axA.text(0, 0.06, "N", fontsize=11, ha="center", fontweight="bold", color="w")
-    axA.set_xlim(-R * 1.08, R * 1.08); axA.set_ylim(-R - 0.47, R * 1.08)
+    # pole (d) axes with N/S polarity
+    Rr = g["R_rotor"]
+    for kp in range(d.poles):
+        a = math.radians(kp * 360.0 / d.poles)
+        axA.plot([0, 1.05 * Rr * math.cos(a)], [0, 1.05 * Rr * math.sin(a)], "k-.", lw=0.6)
+        axA.text(0.62 * Rr * math.cos(a), 0.62 * Rr * math.sin(a), "NS"[kp % 2], fontsize=13,
+                 ha="center", va="center", fontweight="bold", color="w")
+    axA.text(0.30 * Rr, 0.05 * Rr, "d-axis", fontsize=7)
+    axA.set_xlim(-R * 1.08, R * 1.08); axA.set_ylim(-R * 1.42, R * 1.08)
     axA.set_aspect("equal"); axA.axis("off")
-    axA.set_title(f"Cross-section — {d.S_rated / 1e6:.0f} MVAr, {d.V_line / 1e3:.1f} kV, "
-                  f"{d.f:.0f} Hz, {d.poles}-pole, {d.Qs} stator slots / "
-                  f"{d.Qr_pitches - 2 * d.Qr_omit_per_pole} rotor slots", fontsize=11)
+    axA.set_title(f"Cross-section — {fmt_q(d.S_rated / 1e3)}, {fmt_v(d.V_line)}, "
+                  f"{d.f:.0f} Hz, {d.poles}-pole {d.rpm:.0f} rpm, {d.Qs} stator slots / "
+                  f"{d.wound_rotor_slots} rotor slots", fontsize=11)
 
     # ---------------- B: radial detail -----------------------------------
     k = d.Qs // 4                               # stator slot near the top
     s_centre = k * g["s_pitch_deg"] + g["s_slot_start"] + 0.5 * g["s_slot_deg"]
     rot = 90.0 - s_centre                       # put that slot vertical
     draw_section(axB, d, rot=rot)
-    x0 = -0.20
+    sc = (g["R_out"] - g["r_slot_bottom"]) / 0.77       # layout scale (1.0 for the 100 MVAr design)
+    x0 = -0.20 * sc
     radii = [g["r_slot_bottom"], g["r_wedge_bottom"], g["R_rotor"], g["R_bore"], g["s1"], g["s2"],
              g["s3"], g["R_out"]]
-    names = ["field winding", "rotor wedge", "air gap", "stator wedge", "top bar", "bottom bar",
+    names = ["field winding", "rotor wedge", "air gap", "stator wedge", "top layer", "bottom layer",
              "stator yoke"]
     for r in radii:
-        axB.plot([x0 - 0.01, 0.13], [r, r], color=C_DIM, lw=0.35, ls=(0, (4, 3)))
+        axB.plot([x0 - 0.01 * sc, 0.13 * sc], [r, r], color=C_DIM, lw=0.35, ls=(0, (4, 3)))
     for i, name in enumerate(names):
         r0, r1 = radii[i], radii[i + 1]
-        side = -0.075 if i % 2 else 0.0
+        side = -0.075 * sc if i % 2 else 0.0
         _dim(axB, (x0 + side, r0), (x0 + side, r1), f"{name}\n{mm(r1 - r0)} mm",
-             off=(-0.045 if i % 2 else 0.045, 0), fs=7)
+             off=((-0.045 if i % 2 else 0.045) * sc, 0), fs=7)
     # rotor tooth/slot area: slot depth total
-    _dim(axB, (0.16, g["r_slot_bottom"]), (0.16, g["R_rotor"]),
-         f"rotor slot depth\n{mm(d.r_slot_depth)} mm", off=(0.05, 0), fs=7)
-    _dim(axB, (0.16, g["R_bore"]), (0.16, g["s3"]),
-         f"stator slot depth\n{mm(g['s3'] - g['R_bore'])} mm", off=(0.05, 0), fs=7)
+    _dim(axB, (0.16 * sc, g["r_slot_bottom"]), (0.16 * sc, g["R_rotor"]),
+         f"rotor slot depth\n{mm(d.r_slot_depth)} mm", off=(0.05 * sc, 0), fs=7)
+    _dim(axB, (0.16 * sc, g["R_bore"]), (0.16 * sc, g["s3"]),
+         f"stator slot depth\n{mm(g['s3'] - g['R_bore'])} mm", off=(0.05 * sc, 0), fs=7)
     # widths (chords) of the vertical stator slot at the bore and at the bottom
     for r, lab, dy in ((g["s1"], "slot width at bore", 0.004), (g["s3"], "slot width at bottom", 0.012)):
         half = r * math.sin(math.radians(0.5 * g["s_slot_deg"]))      # chord at radius r
-        _dim(axB, (-half, r + dy), (half, r + dy), f"{lab} {mm(2 * half)} mm", off=(0, 0.018), fs=7)
+        _dim(axB, (-half, r + dy * sc), (half, r + dy * sc), f"{lab} {mm(2 * half)} mm",
+             off=(0, 0.018 * sc), fs=7)
     tooth_bore = 2 * g["R_bore"] * math.sin(math.radians(0.5 * (g["s_pitch_deg"] - g["s_slot_deg"])))
-    axB.set_xlim(-0.36, 0.30); axB.set_ylim(g["r_slot_bottom"] - 0.05, g["R_out"] + 0.04)
+    axB.set_xlim(-0.36 * sc, 0.30 * sc)
+    axB.set_ylim(g["r_slot_bottom"] - 0.05 * sc, g["R_out"] + 0.04 * sc)
     axB.set_aspect("equal"); axB.axis("off")
     axB.set_title("Radial build-up (detail at a stator slot)", fontsize=11)
 
@@ -162,7 +169,7 @@ def plot_cross_section(d: SCDesign, path: str):
         ("Rotor surface speed", f"{d.omega / (d.poles / 2) * d.R_rotor:.0f} m/s"),
         ("STATOR", ""),
         ("Slots / slot pitch", f"{d.Qs} / {g['s_pitch_deg']:.2f}°"),
-        ("Slot depth (wedge + 2 bars)", f"{mm(g['s3'] - g['R_bore'])} mm"),
+        ("Slot depth (wedge + 2 layers)", f"{mm(g['s3'] - g['R_bore'])} mm"),
         ("Slot width bore / bottom", f"{mm(2 * g['s1'] * math.sin(math.radians(g['s_slot_deg'] / 2)))}"
                                      f" / {mm(2 * g['s3'] * math.sin(math.radians(g['s_slot_deg'] / 2)))} mm"),
         ("Tooth width bore / root", f"{mm(tooth_bore)} / {mm(st_bot)} mm"),
@@ -170,7 +177,7 @@ def plot_cross_section(d: SCDesign, path: str):
         ("Winding", f"2-layer, pitch {d.coil_pitch}/{d.Qs // d.poles}, {d.parallel_paths} path(s)"),
         ("Series turns / phase", f"{d.series_turns:.0f}"),
         ("ROTOR", ""),
-        ("Slot pitches / wound slots", f"{d.Qr_pitches} / {d.Qr_pitches - 2 * d.Qr_omit_per_pole}"),
+        ("Slot pitches / wound slots", f"{d.Qr_pitches} / {d.wound_rotor_slots}"),
         ("Slot depth (incl. wedge)", f"{mm(d.r_slot_depth)} mm"),
         ("Slot width OD / bottom", f"{mm(rs_bore)} / {mm(rs_bot)} mm"),
         ("Tooth width at slot bottom", f"{mm(rt_bot)} mm"),
@@ -189,8 +196,8 @@ def plot_cross_section(d: SCDesign, path: str):
         y -= 0.036
     # legend
     y -= 0.02
-    for c, lab in ((C_STATOR, "stator core (M330-50A)"), (C_ROTOR, "rotor forging"),
-                   (C_ARM, "armature bars (A/B/C)"), (C_FIELD, "field winding"), (C_WEDGE, "wedges")):
+    for c, lab in ((C_STATOR, "stator core (M330-50A)"), (C_ROTOR, "rotor steel"),
+                   (C_ARM, "armature winding (A/B/C)"), (C_FIELD, "field winding"), (C_WEDGE, "wedges")):
         axC.add_patch(plt.Rectangle((0.02, y - 0.008), 0.05, 0.022, fc=c, ec="k", lw=0.4,
                                     transform=axC.transAxes))
         axC.text(0.10, y, lab, fontsize=9, va="center", transform=axC.transAxes)

@@ -11,6 +11,11 @@ import numpy as np
 from matplotlib.tri import Triangulation
 
 from . import machine as mc
+from .machine import fmt_q, fmt_v
+
+
+def _vscale(d):
+    return (1e3, "kV") if d.V_line >= 1000 else (1.0, "V")
 
 REGION_COLORS = {mc.AIR: "#ffffff", mc.ROTOR_IRON: "#8c96a6", mc.STATOR_IRON: "#b9c2cf",
                  mc.FIELD_COIL: "#d9822b", mc.ARM_COIL: "#c0392b", mc.ROTOR_WEDGE: "#d6d6d6",
@@ -36,7 +41,8 @@ def plot_geometry(an, path):
         ax.set_aspect("equal")
         R = an.d.R_stator_out
         if zoom:
-            ax.set_xlim(0.25, 0.85); ax.set_ylim(-0.05, 0.45)
+            Rb = an.d.R_bore
+            ax.set_xlim(0.45 * Rb, 1.52 * Rb); ax.set_ylim(-0.09 * Rb, 0.80 * Rb)
             ax.set_title("Mesh detail: rotor slots, air gap, stator slots")
         else:
             ax.set_xlim(-R * 1.02, R * 1.02); ax.set_ylim(-R * 1.02, R * 1.02)
@@ -73,13 +79,13 @@ def plot_gap(an, path):
     fig, axs = plt.subplots(1, 2, figsize=(13, 4.2), gridspec_kw=dict(width_ratios=[2, 1]))
     axs[0].plot(np.degrees(g["theta"]), g["Br"], lw=1, label="B_r")
     axs[0].plot(np.degrees(g["theta"]), g["Bt"], lw=0.8, label="B_t")
-    axs[0].plot(np.degrees(g["theta"]), g["B1"] * np.cos(g["theta"] - an.res.axes["d"]), "--",
+    axs[0].plot(np.degrees(g["theta"]), g["B1"] * np.cos(an.d.pp * g["theta"] - an.res.axes["d"]), "--",
                 label=f"fundamental {g['B1']:.3f} T")
     axs[0].set_xlabel("stator angle [deg]"); axs[0].set_ylabel("B [T]"); axs[0].grid(alpha=.3)
     axs[0].legend(); axs[0].set_title("No-load air-gap flux density (rated voltage)")
     h = g["harm"]
     axs[1].bar(np.arange(1, len(h)), h[1:] / h[1] * 100)
-    axs[1].set_yscale("log"); axs[1].set_xlabel("space harmonic order")
+    axs[1].set_yscale("log"); axs[1].set_xlabel("space harmonic order (electrical)")
     axs[1].set_ylabel("% of fundamental"); axs[1].set_title("Br harmonic spectrum")
     fig.tight_layout(); fig.savefig(path, dpi=150); plt.close(fig)
 
@@ -88,16 +94,17 @@ def plot_occ_vcurve(an, path):
     d, o, v = an.d, an.res.occ, an.res.vcurve
     fig, axs = plt.subplots(1, 2, figsize=(13, 4.8))
     If = np.r_[0, o["If"]]
-    axs[0].plot(If, np.r_[0, o["E_line"]] / 1e3, "o-", label="OCC (FEM, saturated)")
-    axs[0].plot(If, o["airgap_slope"] * If / 1e3, "--", label="air-gap line")
-    axs[0].axhline(d.V_line / 1e3, color="gray", lw=0.8)
+    vs, vu = _vscale(d)
+    axs[0].plot(If, np.r_[0, o["E_line"]] / vs, "o-", label="OCC (FEM, saturated)")
+    axs[0].plot(If, o["airgap_slope"] * If / vs, "--", label="air-gap line")
+    axs[0].axhline(d.V_line / vs, color="gray", lw=0.8)
     axs[0].axvline(o["If_noload"], color="gray", lw=0.8)
-    axs[0].set_xlabel("field current If [A]"); axs[0].set_ylabel("E line [kV rms]")
-    axs[0].set_title(f"Open-circuit characteristic  (If0 = {o['If_noload']:.0f} A)")
+    axs[0].set_xlabel("field current If [A]"); axs[0].set_ylabel(f"E line [{vu} rms]")
+    axs[0].set_title(f"Open-circuit characteristic  (If0 = {o['If_noload']:.1f} A)")
     axs[0].grid(alpha=.3); axs[0].legend()
-    axs[1].plot(v["If"], v["Q_MVAr"], "o-")
+    axs[1].plot(v["If"], v["Q_kVAr"], "o-")
     axs[1].axhline(0, color="gray", lw=0.8)
-    axs[1].set_xlabel("field current If [A]"); axs[1].set_ylabel("Q [MVAr]  (+ over-excited)")
+    axs[1].set_xlabel("field current If [A]"); axs[1].set_ylabel("Q [kVAr]  (+ over-excited)")
     axs[1].set_title("Reactive capability / V-curve at rated voltage")
     axs[1].grid(alpha=.3)
     fig.tight_layout(); fig.savefig(path, dpi=150); plt.close(fig)
@@ -105,16 +112,17 @@ def plot_occ_vcurve(an, path):
 
 def plot_waveform(an, path):
     w, ta = an.res.waveform, an.res.torque_angle
+    vs, vu = _vscale(an.d)
     fig, axs = plt.subplots(1, 3, figsize=(16, 4.2))
-    axs[0].plot(np.degrees(w["angle"]), w["e"] / 1e3)
-    axs[0].set_xlabel("rotor angle [deg]"); axs[0].set_ylabel("phase EMF [kV]")
-    axs[0].set_title(f"No-load phase-A EMF  (THD {100 * w['thd']:.2f} %)"); axs[0].grid(alpha=.3)
+    axs[0].plot(np.degrees(w["angle"]), w["e"] / vs)
+    axs[0].set_xlabel("rotor angle [electrical deg]"); axs[0].set_ylabel(f"phase EMF [{vu}]")
+    axs[0].set_title(f"No-load phase-A EMF  (THD phase {100 * w['thd']:.2f} %, line {100 * w['thd_line']:.2f} %)"); axs[0].grid(alpha=.3)
     h = w["e_harm"]
     axs[1].bar(np.arange(1, len(h)), h[1:] / h[1] * 100)
     axs[1].set_yscale("log"); axs[1].set_xlabel("time harmonic order")
     axs[1].set_ylabel("% of fundamental"); axs[1].set_title("EMF harmonics")
     axs[2].plot(np.degrees(ta["gamma"]), ta["T"] / 1e3, "o-")
-    axs[2].set_xlabel("current angle from +d axis [deg]"); axs[2].set_ylabel("torque [kNm]")
+    axs[2].set_xlabel("current angle from +d axis [electrical deg]"); axs[2].set_ylabel("torque [kNm]")
     axs[2].set_title("Torque vs. current angle (rated I, rated If)"); axs[2].grid(alpha=.3)
     fig.tight_layout(); fig.savefig(path, dpi=150); plt.close(fig)
 
@@ -129,7 +137,7 @@ def make_all(an, outdir):
     plot_field(an, an.res.solutions["no_load"], "No-load flux lines and |B| at rated voltage", files["noload"])
     files["rated"] = os.path.join(outdir, "03_field_rated_overexcited.png")
     plot_field(an, an.res.solutions["rated_over"],
-               f"Rated over-excited (+{an.d.S_rated / 1e6:.0f} MVAr) flux lines and |B|", files["rated"])
+               f"Rated over-excited (+{fmt_q(an.d.S_rated / 1e3)}) flux lines and |B|", files["rated"])
     files["under"] = os.path.join(outdir, "04_field_under_excited.png")
     plot_field(an, an.res.solutions["under_If0"],
                "Under-excited limit at If = 0 (armature-only excitation)", files["under"])
@@ -151,10 +159,12 @@ CHECKS = {
     "B_rotor_tooth_max": (None, 2.2), "B_rotor_body_max": (None, 2.0),
     "J_arm": (1.5, 4.5), "J_field": (None, 8.0), "thd": (None, 5.0),
 }
+# overrides for small (< 5 MVA) low/medium-voltage machines
+CHECKS_SMALL = {"electric_loading_kA_m": (20.0, 50.0), "B_gap1": (0.6, 1.0), "J_arm": (2.5, 6.0)}
 
 
-def _status(key, v):
-    lim = CHECKS.get(key)
+def _status(key, v, small=False):
+    lim = CHECKS_SMALL.get(key, CHECKS.get(key)) if small else CHECKS.get(key)
     if lim is None or v is None or (isinstance(v, float) and math.isnan(v)):
         return "", "#444444"
     lo, hi = lim
@@ -163,14 +173,18 @@ def _status(key, v):
     return ("✓ " if ok else "⚠ ") + rng, ("#1e8449" if ok else "#c0392b")
 
 
+def _mass(t):
+    return f"{t:.1f} t" if t >= 1 else f"{t * 1e3:.0f} kg"
+
+
 def plot_design_sheet(an, path):
     from .dimensions import draw_section, geometry
     d, r = an.d, an.res
     sm, o, p, ra, L, w = r.summary, r.occ, r.params, r.rated, r.losses, r.waveform
     g = geometry(d)
     fig = plt.figure(figsize=(21, 11.5))
-    fig.suptitle(f"Synchronous Condenser — Design Summary   |   {d.S_rated / 1e6:.0f} MVAr  ·  "
-                 f"{d.V_line / 1e3:.1f} kV  ·  {d.f:.0f} Hz  ·  {d.rpm:.0f} rpm  ·  {d.poles}-pole round rotor",
+    fig.suptitle(f"Synchronous Condenser — Design Summary   |   {fmt_q(d.S_rated / 1e3)}  ·  "
+                 f"{fmt_v(d.V_line)}  ·  {d.f:.0f} Hz  ·  {d.rpm:.0f} rpm  ·  {d.poles}-pole round rotor",
                  fontsize=15, fontweight="bold", x=0.5, y=0.985)
     ax = fig.add_axes([0.005, 0.06, 0.30, 0.86])
     draw_section(ax, d)
@@ -183,8 +197,8 @@ def plot_design_sheet(an, path):
     f0 = lambda v, n=0: f"{v:,.{n}f}"
     cols = [
         [("RATING", None),
-         ("Rated reactive power", f"+{d.S_rated / 1e6:.0f} / {ra['Q_under_If0_MVAr']:.1f} MVAr", None),
-         ("Rated voltage / current", f"{d.V_line / 1e3:.1f} kV / {f0(d.I_rated)} A", None),
+         ("Rated reactive power", f"+{fmt_q(d.S_rated / 1e3)} / {fmt_q(ra['Q_under_If0_kVAr'])}", None),
+         ("Rated voltage / current", f"{fmt_v(d.V_line)} / {f0(d.I_rated)} A", None),
          ("Frequency / speed", f"{d.f:.0f} Hz / {d.rpm:.0f} rpm", None),
          ("Base impedance", f"{d.Z_base:.3f} Ω", None),
          ("MAIN DIMENSIONS", None),
@@ -197,12 +211,12 @@ def plot_design_sheet(an, path):
          ("Stator slots / pitch", f"{d.Qs} / {d.coil_pitch}:{d.Qs // d.poles}", None),
          ("Series turns / paths", f"{d.series_turns:.0f} / {d.parallel_paths}", None),
          ("Winding factor kw1", f"{d.winding_factor():.4f}", None),
-         ("Bar copper area", f"{sm['A_bar_mm2']:.0f} mm²", None),
-         ("Rotor slots / turns per slot", f"{d.Qr_pitches - 2 * d.Qr_omit_per_pole} / {d.Nf_per_slot}", None),
-         ("Field turns (total)", f"{(d.Qr_pitches - 2 * d.Qr_omit_per_pole) * d.Nf_per_slot // 2}", None)],
+         ("Copper area per turn", f"{sm['A_bar_mm2']:.0f} mm²", None),
+         ("Rotor slots / turns per slot", f"{d.wound_rotor_slots} / {d.Nf_per_slot}", None),
+         ("Field turns (total)", f"{d.wound_rotor_slots * d.Nf_per_slot // 2}", None)],
         [("ELECTROMAGNETIC LOADING", None),
          ("Air-gap B₁ (no-load, rated V)", f"{sm['B_gap1']:.3f} T", "B_gap1"),
-         ("Flux per pole", f"{sm['flux_per_pole_Wb']:.2f} Wb", None),
+         ("Flux per pole", f"{sm['flux_per_pole_Wb']:.3g} Wb", None),
          ("Electric loading A", f"{sm['electric_loading_kA_m']:.0f} kA/m", "electric_loading_kA_m"),
          ("FLUX DENSITY (no-load, 98th pct)", None),
          ("Stator teeth", f"{sm['B_stator_tooth_max']:.2f} T", "B_stator_tooth_max"),
@@ -213,28 +227,29 @@ def plot_design_sheet(an, path):
          ("Armature", f"{sm['J_arm']:.2f} A/mm²", "J_arm"),
          ("Field (rated over-excited)", f"{sm['J_field']:.2f} A/mm²", "J_field"),
          ("EMF QUALITY", None),
-         ("Phase EMF THD", f"{100 * w.get('thd', float('nan')):.2f} %", "thd"),
+         ("EMF THD line-to-line", f"{100 * w.get('thd_line', float('nan')):.2f} %", "thd"),
+         ("EMF THD phase (incl. 3rd)", f"{100 * w.get('thd', float('nan')):.2f} %", None),
          ("Saturation factor (OCC)", f"{o['saturation_factor']:.3f}", None)],
         [("REACTANCES / EXCITATION", None),
          ("Xd / Xq (unsaturated)", f"{p['Xd_pu']:.3f} / {p['Xq_pu']:.3f} pu", None),
          ("Short-circuit ratio SCR", f"{p['SCR']:.3f}", None),
-         ("If no-load (rated V)", f"{f0(o['If_noload'])} A", None),
-         ("If short-circuit (rated I)", f"{f0(p['If_sc'])} A", None),
-         ("If rated over-excited", f"{f0(ra['If_rated_over'])} A  ({ra['If_rated_over'] / o['If_noload']:.2f}×)", None),
-         ("Field voltage / resistance", f"{L['V_field_rated']:.0f} V / {L['R_field_ohm']:.3f} Ω", None),
-         ("Rated field ampere-turns", f"{f0(sm['ampere_turns_rated'] / 1e3, 0)} kAt", None),
+         ("If no-load (rated V)", f"{f0(o['If_noload'], 1)} A", None),
+         ("If short-circuit (rated I)", f"{f0(p['If_sc'], 1)} A", None),
+         ("If rated over-excited", f"{f0(ra['If_rated_over'], 1)} A  ({ra['If_rated_over'] / o['If_noload']:.2f}×)", None),
+         ("Field voltage / resistance", f"{L['V_field_rated']:.0f} V / {L['R_field_ohm']:.3g} Ω", None),
+         ("Rated field ampere-turns / pole", f"{sm['ampere_turns_pole'] / 1e3:.1f} kAt", None),
          ("Max static torque", f"{r.torque_angle.get('T_max_pu', float('nan')):.2f} pu", None),
          ("LOSSES (estimate)", None),
-         ("Stator core", f"{L['P_iron_kW']:.0f} kW", None),
-         ("Armature copper", f"{L['P_arm_cu_kW']:.0f} kW", None),
-         ("Field copper", f"{L['P_field_cu_kW']:.0f} kW", None),
-         ("Total EM loss", f"{L['P_total_kW']:.0f} kW  ({L['loss_pct']:.2f} %)", None),
+         ("Stator core", f"{L['P_iron_kW']:.3g} kW", None),
+         ("Armature copper", f"{L['P_arm_cu_kW']:.3g} kW", None),
+         ("Field copper", f"{L['P_field_cu_kW']:.3g} kW", None),
+         ("Total EM loss", f"{L['P_total_kW']:.3g} kW  ({L['loss_pct']:.2f} %)", None),
          ("MASS / INERTIA (active part)", None),
-         ("Stator core / rotor iron", f"{sm['mass_stator_core_t']:.1f} / {sm['mass_rotor_iron_active_t']:.1f} t", None),
-         ("Armature / field copper", f"{sm['mass_arm_cu_t']:.1f} / {sm['mass_field_cu_t']:.1f} t", None),
-         ("Rotor inertia J / H", f"{f0(sm['J_rotor_kgm2'])} kg·m² / {sm['H_inertia_s']:.2f} s", None)],
+         ("Stator core / rotor iron", f"{_mass(sm['mass_stator_core_t'])} / {_mass(sm['mass_rotor_iron_active_t'])}", None),
+         ("Armature / field copper", f"{_mass(sm['mass_arm_cu_t'])} / {_mass(sm['mass_field_cu_t'])}", None),
+         ("Rotor inertia J / H", f"{sm['J_rotor_kgm2']:,.4g} kg·m² / {sm['H_inertia_s']:.2f} s", None)],
     ]
-    values = {"thd": 100 * w.get("thd", float("nan"))}
+    values = {"thd": 100 * w.get("thd_line", float("nan"))}
     for ci, col in enumerate(cols):
         axc = fig.add_axes([0.315 + ci * 0.228, 0.06, 0.218, 0.86]); axc.axis("off")
         y = 0.985
@@ -253,14 +268,15 @@ def plot_design_sheet(an, path):
                      transform=axc.transAxes)
             if key:
                 v = values.get(key, sm.get(key))
-                txt, colr = _status(key, v)
+                txt, colr = _status(key, v, small=d.S_rated < 5e6)
                 axc.text(0.98, y - 0.021, txt, fontsize=7.5, ha="right", va="center", color=colr,
                          transform=axc.transAxes)
                 y -= 0.012
             axc.plot([0.02, 0.98], [y - 0.017, y - 0.017], color="#e2e2e2", lw=0.6,
                      transform=axc.transAxes)
             y -= 0.040
-    fig.text(0.315, 0.025, "✓/⚠ ranges are indicative guidance for indirectly-cooled 2-pole machines, "
+    scope = ("small LV/MV machines" if d.S_rated < 5e6 else "large indirectly-cooled machines")
+    fig.text(0.315, 0.025, f"✓/⚠ ranges are indicative guidance for {scope}, "
              "not a code requirement. Flux densities: 98th percentile of element |B| at no-load, rated voltage. "
              "Iron masses over the active length; copper masses include end windings.",
              fontsize=8, style="italic", color="#555555")

@@ -23,7 +23,7 @@ import numpy as np
 
 from sc_fem2d.analysis import SCAnalysis, fundamental_axis
 from sc_fem2d.dimensions import geometry, rotor_wound
-from sc_fem2d.machine import SCDesign, field_sign, winding_layout
+from sc_fem2d.machine import DESIGN_PRESETS, SCDesign, design_preset, field_sign, winding_layout
 from sc_fem2d.materials import ROTOR_FORGING, STATOR_LAMINATION
 
 ROTOR_GROUP = 1
@@ -129,7 +129,8 @@ def build_femm_model(femm, d: SCDesign, path: str, linear: bool = False):
     femm.mi_setarcsegmentprop(coarse, "A0", 0, 0)
     femm.mi_clearselected()
     # block labels ----------------------------------------------------------
-    m_gap, m_slot, m_iron = d.gap / 6, 0.010, 0.025
+    sc = d.R_stator_out / 1.12                     # mesh sizes scale with machine size
+    m_gap, m_slot, m_iron = d.gap / 6, 0.010 * sc, 0.025 * sc
     dr.label(0.5 * (g["s3"] + g["R_out"]), 0.1, "StatorLam", m_iron)
     dr.label(0.5 * g["r_slot_bottom"], 0.1, "RotorForging", m_iron, group=ROTOR_GROUP)
     dr.label(0.5 * (g["R_rotor"] + g["R_bore"]), 0.1, "Air", m_gap)
@@ -211,14 +212,15 @@ def femm_solve(femm, d: SCDesign, i_abc, i_f, path=None, show=False):
         bx, by = femm.mo_getb(r * math.cos(t), r * math.sin(t))
         Br.append(bx * math.cos(t) + by * math.sin(t))
     femm.mo_close()
-    B1 = fundamental_axis(th, np.array(Br))[0]
+    B1 = fundamental_axis(th, np.array(Br), d.pp)[0]
     return np.array(psi, float), float(np.real(torque)), B1
 
 
 # ----------------------------------------------------------------- compare
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("--out", default="femm_model")
+    ap.add_argument("--design", default="factory300", choices=DESIGN_PRESETS)
+    ap.add_argument("--out", default=None, help="default femm_model_<design>")
     ap.add_argument("--build-only", action="store_true")
     ap.add_argument("--show", action="store_true")
     ap.add_argument("--linear", action="store_true",
@@ -229,9 +231,10 @@ def main():
     except ImportError:
         raise SystemExit("pyfemm not found: install FEMM 4.2 (femm.info) and run  pip install pyfemm")
 
+    d = design_preset(a.design)
+    a.out = a.out or f"femm_model_{a.design}"
     os.makedirs(a.out, exist_ok=True)
     fem_path = os.path.abspath(os.path.join(a.out, "sc_model.fem"))
-    d = SCDesign()
     femm.openfemm(0 if a.show else 1)
     build_femm_model(femm, d, fem_path, linear=a.linear)
     print("FEMM model written:", fem_path)
@@ -267,7 +270,7 @@ def main():
         t0 = time.time()
         sp = an.solve(i_abc=cur, i_f=If, **({"linear_mu_r": 1000.0} if a.linear else {}))
         th, Br, _ = an.model.gap_flux_density(sp, radius=d.R_rotor + 0.5 * d.gap)
-        py = dict(psi=dq(sp.psi_abc), T=sp.torque, B1=fundamental_axis(th, Br)[0])
+        py = dict(psi=dq(sp.psi_abc), T=sp.torque, B1=fundamental_axis(th, Br, d.pp)[0])
         try:
             psi_f, T_f, B1_f = femm_solve(femm, d, cur, If, fem_path, a.show)
         except Exception as e:                      # noqa: BLE001
@@ -299,7 +302,7 @@ def main():
     print("\n" + table)
     with open(os.path.join(a.out, "femm_comparison.md"), "w", encoding="utf-8") as fh:
         fh.write("# Python FEM vs FEMM 4.2\n\n"
-                 f"If0 = {If0:.0f} A, If rated = {If_r:.0f} A, I rated = {d.I_rated:.0f} A.\n\n"
+                 f"If0 = {If0:.1f} A, If rated = {If_r:.1f} A, I rated = {d.I_rated:.0f} A.\n\n"
                  + table + "\n\nDifferences of 1–3 % are expected (different meshes; FEMM uses its own "
                  "B–H interpolation; torque from the weighted stress tensor vs Arkkio).\n")
     print("\nSaved", os.path.join(a.out, "femm_comparison.md"))

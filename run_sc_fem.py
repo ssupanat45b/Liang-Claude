@@ -4,7 +4,8 @@
 Usage:
     python run_sc_fem.py            # full study  (~ a few minutes)
     python run_sc_fem.py --quick    # coarser sweeps for a fast check
-    python run_sc_fem.py --out results --S 160 --V 15.75
+    python run_sc_fem.py --design sc100     # original 100 MVAr example
+    python run_sc_fem.py --Q 500             # factory design re-rated to 500 kVAr
 
 Outputs (in --out): PNG figures, results.json and report.md
 """
@@ -19,7 +20,7 @@ import time
 import numpy as np
 
 from sc_fem2d.analysis import SCAnalysis
-from sc_fem2d.machine import SCDesign, apply_mesh_preset
+from sc_fem2d.machine import DESIGN_PRESETS, apply_mesh_preset, design_preset, fmt_q, fmt_v
 from sc_fem2d.solver import backend_name
 from sc_fem2d import plots
 
@@ -43,7 +44,7 @@ def write_report(an, files, path, runtime):
     B1 = r.gap_field["B1"]
     lines = f"""# Synchronous Condenser — 2-D Electromagnetic FEM Study
 
-Example machine: **{d.S_rated / 1e6:.0f} MVAr, {d.V_line / 1e3:.1f} kV, {d.f:.0f} Hz, {d.poles}-pole, {d.rpm:.0f} rpm**, round (cylindrical) rotor.
+Machine: **{fmt_q(d.S_rated / 1e3)}, {fmt_v(d.V_line)}, {d.f:.0f} Hz, {d.poles}-pole, {d.rpm:.0f} rpm**, round (cylindrical) rotor with distributed field winding.
 Nonlinear magnetostatic A<sub>z</sub> FEM, first-order triangles, Newton–Raphson, sliding air-gap interface.
 Mesh: {r.mesh_stats['elements']} elements / {r.mesh_stats['nodes']} nodes. Runtime {runtime:.0f} s.
 
@@ -59,7 +60,7 @@ Mesh: {r.mesh_stats['elements']} elements / {r.mesh_stats['nodes']} nodes. Runti
 | Active length | {d.L_stack:.2f} m |
 | Stator slots / coil pitch | {d.Qs} / {d.coil_pitch} slots (full pitch {d.Qs // d.poles}) |
 | Armature winding | double layer, {d.parallel_paths} parallel paths, {d.series_turns:.0f} series turns/phase, k<sub>w1</sub> = {d.winding_factor():.4f} |
-| Rotor slots | {d.Qr_pitches - 2 * d.Qr_omit_per_pole} wound of {d.Qr_pitches} pitches, {d.Nf_per_slot} turns/slot |
+| Rotor slots | {d.wound_rotor_slots} wound of {d.Qr_pitches} pitches, {d.Nf_per_slot} turns/slot |
 | Rotor peripheral speed | {d.omega / (d.poles / 2) * d.R_rotor:.0f} m/s |
 
 ![cross-section dimensions]({rel(files['dimensions'])})
@@ -69,13 +70,13 @@ Mesh: {r.mesh_stats['elements']} elements / {r.mesh_stats['nodes']} nodes. Runti
 
 | Result | Value |
 |---|---|
-| Field current for rated voltage, I<sub>f0</sub> | **{o['If_noload']:.0f} A** |
-| Field current on the air-gap line | {o['If_airgap']:.0f} A |
+| Field current for rated voltage, I<sub>f0</sub> | **{o['If_noload']:.1f} A** |
+| Field current on the air-gap line | {o['If_airgap']:.1f} A |
 | Saturation factor I<sub>f0</sub>/I<sub>f,ag</sub> | {o['saturation_factor']:.3f} |
 | Air-gap B<sub>r</sub> fundamental | {B1:.3f} T |
-| EMF fundamental (rotation sweep) | {w['E_line_rms_fund'] / 1e3:.2f} kV line |
-| EMF THD | {100 * w['thd']:.2f} % |
-| Peak no-load cogging torque | {np.abs(w['cogging']).max() / 1e3:.1f} kNm |
+| EMF fundamental (rotation sweep) | {fmt_v(w['E_line_rms_fund'])} line |
+| EMF THD line-to-line / phase | {100 * w['thd_line']:.2f} % / {100 * w['thd']:.2f} % (triplen harmonics cancel line-to-line) |
+| Peak no-load cogging torque | {np.abs(w['cogging']).max():.3g} Nm |
 
 ![no load]({rel(files['noload'])})
 ![air gap]({rel(files['gap'])})
@@ -86,18 +87,18 @@ Mesh: {r.mesh_stats['elements']} elements / {r.mesh_stats['nodes']} nodes. Runti
 |---|---|
 | X<sub>d</sub> (unsaturated, incl. end leakage {d.X_end_pu:.2f} pu) | **{p['Xd_pu']:.3f} pu** |
 | X<sub>q</sub> (unsaturated) | {p['Xq_pu']:.3f} pu |
-| Field current for rated armature current on short circuit, I<sub>f,sc</sub> | {p['If_sc']:.0f} A |
+| Field current for rated armature current on short circuit, I<sub>f,sc</sub> | {p['If_sc']:.1f} A |
 | Short-circuit ratio SCR = I<sub>f0</sub>/I<sub>f,sc</sub> | **{p['SCR']:.3f}** |
 
 ## 4. Reactive capability
 
 | Operating point | Value |
 |---|---|
-| Rated over-excited Q | +{ra['Q_over_MVAr']:.0f} MVAr at I = {d.I_rated:.0f} A |
-| Rated field current (over-excited) | **{ra['If_rated_over']:.0f} A** ({ra['If_rated_over'] / o['If_noload']:.2f} × I<sub>f0</sub>) |
-| Under-excited capability at I<sub>f</sub> = 0 | {ra['Q_under_If0_MVAr']:.1f} MVAr (I = {ra['I_under_If0']:.0f} A) |
-| Air-gap torque at rated over-excited point | {ra['torque_over'] / 1e3:.2f} kNm (≈ 0: no active power) |
-| Max static torque at rated I, rated I<sub>f</sub> | {r.torque_angle['T_max_pu']:.2f} pu (T<sub>base</sub> = {r.torque_angle['T_base'] / 1e3:.0f} kNm) |
+| Rated over-excited Q | +{fmt_q(ra['Q_over_kVAr'])} at I = {d.I_rated:.0f} A |
+| Rated field current (over-excited) | **{ra['If_rated_over']:.1f} A** ({ra['If_rated_over'] / o['If_noload']:.2f} × I<sub>f0</sub>) |
+| Under-excited capability at I<sub>f</sub> = 0 | {fmt_q(ra['Q_under_If0_kVAr'])} (I = {ra['I_under_If0']:.0f} A) |
+| Air-gap torque at rated over-excited point | {ra['torque_over']:.3g} Nm (≈ 0: no active power) |
+| Max static torque at rated I, rated I<sub>f</sub> | {r.torque_angle['T_max_pu']:.2f} pu (T<sub>base</sub> = {r.torque_angle['T_base']:,.0f} Nm) |
 
 ![rated]({rel(files['rated'])})
 ![under]({rel(files['under'])})
@@ -108,10 +109,10 @@ Mesh: {r.mesh_stats['elements']} elements / {r.mesh_stats['nodes']} nodes. Runti
 
 | Loss component | Value |
 |---|---|
-| Stator core (Steinmetz, build factor {d.build_factor}) | {L['P_iron_kW']:.0f} kW (core mass {L['stator_core_mass_t']:.1f} t) |
-| Armature copper, R<sub>ph</sub> = {L['R_phase_mohm']:.2f} mΩ | {L['P_arm_cu_kW']:.0f} kW (J = {L['J_arm_A_mm2']:.1f} A/mm²) |
-| Field copper, R<sub>f</sub> = {L['R_field_ohm']:.3f} Ω, U<sub>f</sub> = {L['V_field_rated']:.0f} V | {L['P_field_cu_kW']:.0f} kW (J = {L['J_field_A_mm2']:.1f} A/mm²) |
-| **Total electromagnetic loss** | **{L['P_total_kW']:.0f} kW ({L['loss_pct']:.2f} % of rating)** |
+| Stator core (Steinmetz, build factor {d.build_factor}) | {L['P_iron_kW']:.3g} kW (core mass {L['stator_core_mass_t'] * 1e3:,.0f} kg) |
+| Armature copper, R<sub>ph</sub> = {L['R_phase_mohm']:.2f} mΩ | {L['P_arm_cu_kW']:.3g} kW (J = {L['J_arm_A_mm2']:.1f} A/mm²) |
+| Field copper, R<sub>f</sub> = {L['R_field_ohm']:.3g} Ω, U<sub>f</sub> = {L['V_field_rated']:.0f} V | {L['P_field_cu_kW']:.3g} kW (J = {L['J_field_A_mm2']:.1f} A/mm²) |
+| **Total electromagnetic loss** | **{L['P_total_kW']:.3g} kW ({L['loss_pct']:.2f} % of rating)** |
 
 Friction, windage, bearing, and stray-load losses are not included.
 
@@ -119,7 +120,7 @@ Friction, windage, bearing, and stray-load losses are not included.
 
 * 2-D magnetostatic analysis per unit length × active length; end-winding leakage is added as a fixed reactance (X<sub>end</sub> = {d.X_end_pu:.2f} pu); end-region fields, axial ducts, and stacking factor are neglected in the field solution.
 * Slots are modelled as annular sectors (radial sides) on a structured polar mesh; slot openings and wedges are non-magnetic.
-* Rotor body: solid forging B–H curve. Stator: M330-50A-class lamination. No eddy currents (magnetostatic).
+* Rotor body: solid steel B–H curve. Stator: M330-50A-class lamination. No eddy currents (magnetostatic).
 * Purely reactive operation: armature MMF on the d-axis (−d over-excited, +d under-excited); armature resistance is neglected for voltage.
 * Losses: Steinmetz iron loss using the peak element flux density from the rotation sweep; copper at 75 °C.
 """
@@ -129,9 +130,12 @@ Friction, windage, bearing, and stray-load losses are not included.
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("--out", default="results")
+    ap.add_argument("--design", default="factory300", choices=DESIGN_PRESETS,
+                    help="design preset: factory300 (300 kVAr 0.4 kV 4-pole, default) or sc100 (100 MVAr 13.8 kV 2-pole)")
+    ap.add_argument("--out", default=None, help="output folder (default results_<design>)")
     ap.add_argument("--quick", action="store_true")
-    ap.add_argument("--S", type=float, help="rated MVAr")
+    ap.add_argument("--Q", type=float, help="rated reactive power kVAr")
+    ap.add_argument("--S", type=float, help="rated reactive power MVAr")
     ap.add_argument("--V", type=float, help="rated line voltage kV")
     ap.add_argument("--f", type=float, help="frequency Hz")
     ap.add_argument("--length", type=float, help="active core length m")
@@ -140,7 +144,9 @@ def main():
                     help="mesh density preset (default normal)")
     args = ap.parse_args()
 
-    d = apply_mesh_preset(SCDesign(), args.mesh)
+    d = apply_mesh_preset(design_preset(args.design), args.mesh)
+    args.out = args.out or ("results" if args.design == "sc100" else f"results_{args.design}")
+    if args.Q: d.S_rated = args.Q * 1e3
     if args.S: d.S_rated = args.S * 1e6
     if args.V: d.V_line = args.V * 1e3
     if args.f: d.f = args.f
@@ -149,7 +155,7 @@ def main():
         bore = d.R_bore
         d.gap = args.gap
         d.R_rotor = bore - d.gap
-    print(f"linear solver: {backend_name()} | mesh preset: {args.mesh}")
+    print(f"design: {args.design} | linear solver: {backend_name()} | mesh preset: {args.mesh}")
 
     t0 = time.time()
     an = SCAnalysis(d)
