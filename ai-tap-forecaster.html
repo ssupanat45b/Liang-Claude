@@ -189,6 +189,12 @@ input[type="range"] { width: 100%; accent-color: var(--accent); }
 }
 .file .btn { padding: 5px 10px; font-size: 12.5px; }
 .file-stat { font-size: 12px; color: var(--muted); }
+.amr { font-size: 12px; display: grid; grid-template-columns: auto 1fr; gap: 2px 10px; padding: 8px 10px; border-radius: 6px; background: var(--surface); border: 1px solid var(--line); }
+.amr span { color: var(--muted); }
+.amr b { font-weight: 500; overflow-wrap: anywhere; }
+.amr .ph { grid-column: 1 / -1; margin-top: 4px; }
+.amr table { font-size: 11.5px; }
+.amr th, .amr td { padding: 3px 4px; }
 .file-stat b { font-family: var(--f-mono); font-weight: 500; color: var(--ink); }
 details.adv summary { cursor: pointer; font-size: 12.5px; color: var(--muted); }
 details.adv[open] summary { margin-bottom: 10px; }
@@ -381,7 +387,7 @@ footer { max-width: 1440px; margin: 24px auto 0; color: var(--muted); font-size:
         <h2><b>05</b>แรงดันไฟฟ้าแรงสูง <span style="text-transform:none">(<span class="hvkv">22 kV</span>)</span></h2>
         <div class="seg" role="radiogroup" aria-label="แหล่งข้อมูลแรงดันแรงสูง">
           <label><input type="radio" name="hvsrc" value="sim" checked><span>จำลองโดยระบบ</span></label>
-          <label><input type="radio" name="hvsrc" value="csv"><span>นำเข้าไฟล์ .CSV</span></label>
+          <label><input type="radio" name="hvsrc" value="csv"><span>นำเข้า AMR / CSV</span></label>
         </div>
         <p class="hint" id="hvHint">แรงดัน 22 kV ขึ้นตามความเข้มแสงอาทิตย์ของพื้นที่ที่เลือก (PV จำนวนมากบนสายป้อนจ่ายไฟย้อน) และตกตามโหลด แล้วส่งผ่านหม้อแปลงไปยังด้านแรงต่ำ</p>
         <label class="field" id="hvSunField">
@@ -389,11 +395,13 @@ footer { max-width: 1440px; margin: 24px auto 0; color: var(--muted); font-size:
           <input type="range" id="hvSun" min="0" max="3" step="0.1" value="1.5">
         </label>
         <div class="file" id="hvBox" hidden>
-          <input type="file" id="hvFile" accept=".csv,text/csv,text/plain" aria-label="เลือกไฟล์ CSV แรงดันแรงสูง">
-          <div class="file-stat" id="hvStat">ยังไม่ได้เลือกไฟล์ · ลากไฟล์มาวางที่กรอบนี้ได้</div>
-          <div class="cv" style="height:70px" id="hvPrevWrap" hidden><canvas id="hvPrev"></canvas></div>
+          <input type="file" id="hvFile" multiple accept=".xls,.htm,.html,.csv,text/csv,text/html,application/vnd.ms-excel" aria-label="เลือกไฟล์แรงดันจากมิเตอร์ AMR หรือ CSV">
+          <div class="file-stat" id="hvStat">ยังไม่ได้เลือกไฟล์ · เลือกได้หลายไฟล์ (เช่น 3 เดือน) หรือลากไฟล์มาวางที่กรอบนี้</div>
+          <div class="amr" id="amrInfo" hidden></div>
+          <label class="field" id="hvPhF" hidden><span>เฟสที่ใช้เป็นแรงดันแรงสูง</span><select id="hvPh"></select></label>
+          <div class="cv" style="height:90px" id="hvPrevWrap" hidden><canvas id="hvPrev"></canvas></div>
           <button type="button" class="btn" id="hvTpl">ดาวน์โหลดไฟล์ตัวอย่าง (96 จุด)</button>
-          <p class="hint">รูปแบบ: <span class="mono">time,hv</span> ตั้งแต่ 00:00 ถึง 24:00 ทุก 15 นาที (96 หรือ 97 แถว) ค่าเป็น V หรือ kV ก็ได้ ถ้ามีหลายวัน (96×n แถว) จะใช้เรียงตามวันและวนซ้ำจนครบช่วงข้อมูล</p>
+          <p class="hint"><b>AMR:</b> ไฟล์ "รายงานข้อมูลแรงดันรายเดือน" (.xls) ที่ส่งออกจากระบบ AMR ใช้ได้โดยตรง ระบบอ่านอัตราส่วน VT แล้วแปลงเป็นแรงดันด้านแรงสูง และตั้งช่วงวันที่ตามข้อมูลให้เอง<br><b>CSV:</b> <span class="mono">time,hv</span> ตั้งแต่ 00:00 ถึง 24:00 ทุก 15 นาที (96 หรือ 97 แถวต่อวัน) ค่าเป็น V หรือ kV</p>
         </div>
       </section>
 
@@ -706,16 +714,16 @@ class LSTMNet {
 }
 
 /* ===== Train / test split + standardization (MATLAB section 3) ===== */
-function prepare(rows) {
+function prepare(rows, features = FEATURES) {
   const approx = Math.round(0.8 * rows.length);
   const mids = [];
   rows.forEach((r, i) => { if (r.slot === 0) mids.push(i); });
   let split = mids[0], best = Infinity;
   for (const m of mids) { const d = Math.abs(m - approx); if (d < best) { best = d; split = m; } }
   const train = rows.slice(0, split), test = rows.slice(split);
-  const F = FEATURES.length;
+  const F = features.length;
   const mu = new Float64Array(F), sig = new Float64Array(F);
-  FEATURES.forEach((f, j) => {
+  features.forEach((f, j) => {
     let s = 0; for (const r of train) s += r[f]; mu[j] = s / train.length;
     let q = 0; for (const r of train) q += (r[f] - mu[j]) ** 2;
     sig[j] = Math.sqrt(q / (train.length - 1)) || 1;
@@ -724,14 +732,14 @@ function prepare(rows) {
   const muY = sy / train.length;
   let qy = 0; for (const r of train) qy += (r.voltage - muY) ** 2;
   const sigY = Math.sqrt(qy / (train.length - 1)) || 1;
-  const norm = set => set.map(r => Float64Array.from(FEATURES, (f, j) => (r[f] - mu[j]) / sig[j]));
-  return { split, train, test, Xtr: norm(train), Xte: norm(test), Ytr: train.map(r => (r.voltage - muY) / sigY), muY, sigY };
+  const norm = set => set.map(r => Float64Array.from(features, (f, j) => (r[f] - mu[j]) / sig[j]));
+  return { features, split, train, test, Xtr: norm(train), Xte: norm(test), Ytr: train.map(r => (r.voltage - muY) / sigY), muY, sigY };
 }
 
 // Truncated BPTT over one-day windows, mini-batched. onEpoch(ep, loss) may return a promise (UI yield)
 async function trainLSTM(P, cfg, onEpoch) {
   const rng = makeRng(7);
-  const net = new LSTMNet(FEATURES.length, cfg.hidden, rng);
+  const net = new LSTMNet(P.features.length, cfg.hidden, rng);
   const win = 96, chunks = [];
   for (let s = 0; s + 8 <= P.Xtr.length; s += win) chunks.push([s, Math.min(s + win, P.Xtr.length)]);
   const dropAt = Math.round(cfg.epochs * 2 / 3);
@@ -862,7 +870,7 @@ class Chart {
     }
     g.setLineDash([]);
     for (const se of s.series) {
-      const pts = se.y.map((v, i) => [X(s.x[i]), Y(v)]);
+      const pts = Array.from(se.y, (v, i) => [X(s.x[i]), Y(v)]); // works for typed arrays too
       if (se.fill) {
         g.beginPath(); g.moveTo(pts[0][0], Y(Math.max(lo, 0)));
         pts.forEach(p => g.lineTo(p[0], p[1])); g.lineTo(pts[pts.length - 1][0], Y(Math.max(lo, 0))); g.closePath();
@@ -1155,7 +1163,7 @@ function hvRangeErr(d) {
   return d.lo < vn * 0.7 || d.hi > vn * 1.3 ? `ค่าในไฟล์อยู่ช่วง ${d.lo.toFixed(0)}–${d.hi.toFixed(0)} V ไม่ใช่ระดับ ${hvTxt()} ที่เลือกในหัวข้อ 02` : "";
 }
 function parseHvCsv(text) {
-  const lines = text.replace(/^\uFEFF/, "").split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+  const lines = text.replace(/^﻿/, "").split(/\r?\n/).map(l => l.trim()).filter(Boolean);
   const vals = [], times = [];
   for (const line of lines) {
     const cells = line.split(/[,;\t]/).map(c => c.trim().replace(/^"|"$/g, ""));
@@ -1180,14 +1188,187 @@ function parseHvCsv(text) {
   const values = vals.map(v => v * k);
   const lo = Math.min(...values), hi = Math.max(...values);
   const err = hvRangeErr({ lo, hi }); if (err) throw new Error(err);
-  return { values, days: values.length / 96, lo, hi, mean: values.reduce((a, b) => a + b, 0) / values.length, kv: k === 1000 };
+  return { kind: "profile", values, days: values.length / 96, lo, hi, mean: values.reduce((a, b) => a + b, 0) / values.length, kv: k === 1000 };
 }
-async function loadHvFile(file) {
+
+/* ----- AMR monthly voltage report (.xls saved as an HTML table) ----- */
+const dayKey = (y, m, d) => `${y}-${pad2(m)}-${pad2(d)}`;
+const keyDate = k => { const [y, m, d] = k.split("-").map(Number); return Date.UTC(y, m - 1, d); };
+const dateKeyOf = t => { const x = new Date(t); return dayKey(x.getUTCFullYear(), x.getUTCMonth() + 1, x.getUTCDate()); };
+const isAmrText = t => /<t[dr][\s>]/i.test(t) && /PHASE\s*A/i.test(t);
+function parseAmr(text) {
+  const doc = new DOMParser().parseFromString(text, "text/html");
+  const rows = Array.from(doc.querySelectorAll("tr"), tr => Array.from(tr.querySelectorAll("td,th"), c => c.textContent.replace(/\s+/g, " ").trim()));
+  const meta = {};
+  const label = (re, key) => { for (const r of rows) for (let i = 0; i < r.length - 1; i++) if (re.test(r[i])) { meta[key] = r[i + 1]; return; } };
+  label(/บัญชีผู้ใช้ไฟ/, "account"); label(/ชื่อผู้ใช้ไฟ/, "customer"); label(/หมายเลขมิเตอร์/, "meter");
+  label(/^CT Ratio/i, "ct"); label(/^VT Ratio/i, "vt"); label(/^Tariff/i, "tariff");
+  for (const r of rows) { const mm = r.join(" ").match(/ประจำเดือน\s*:\s*([^\]]+)/); if (mm) { meta.month = mm[1].trim(); break; } }
+  const hdr = rows.findIndex(r => r.some(c => /^PHASE\s*A$/i.test(c)));
+  if (hdr < 0) throw new Error("ไม่พบหัวตาราง PHASE A / B / C");
+  const cols = {};
+  rows[hdr].forEach((c, i) => { const m = c.match(/^PHASE\s*([ABC])$/i); if (m) cols[m[1].toUpperCase()] = i; });
+  // VT 22000:110 -> primary = secondary x 200
+  const vt = (meta.vt || "").match(/([\d.,]+)\s*:\s*([\d.,]+)/);
+  const vtP = vt ? parseFloat(vt[1].replace(/,/g, "")) : NaN, vtS = vt ? parseFloat(vt[2].replace(/,/g, "")) : NaN;
+  const data = { A: new Map(), B: new Map(), C: new Map() };
+  let n = 0;
+  for (const r of rows.slice(hdr + 1)) {
+    const m = (r[0] || "").match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})\s+(\d{1,2})[.:](\d{2})$/);
+    if (!m) continue;
+    let y = +m[3]; if (y > 2400) y -= 543;
+    // the meter stamps the END of each 15-min interval: 00.15 = 00:00–00:15, 24.00 = 23:45–24:00
+    let t = Date.UTC(y, +m[2] - 1, +m[1]) + (+m[4] * 60 + +m[5] - 15) * 60000;
+    const key = dateKeyOf(t), slot = Math.round(((t % 86400000) + 86400000) % 86400000 / 900000);
+    n++;
+    for (const ph of ["A", "B", "C"]) {
+      if (cols[ph] == null) continue;
+      const v = parseFloat((r[cols[ph]] || "").replace(/,/g, ""));
+      if (!(v > 0)) continue;
+      if (!data[ph].has(key)) data[ph].set(key, new Float64Array(96).fill(NaN));
+      data[ph].get(key)[slot] = v;
+    }
+  }
+  if (!n) throw new Error("ไม่พบแถวข้อมูลวันที่/เวลา");
+  return { meta, data, vtP, vtS, n };
+}
+function mergeAmr(parts, names) {
+  const data = { A: new Map(), B: new Map(), C: new Map() };
+  let n = 0;
+  for (const p of parts) {
+    n += p.n;
+    for (const ph of ["A", "B", "C"]) for (const [k, arr] of p.data[ph]) {
+      const cur = data[ph].get(k);
+      if (!cur) data[ph].set(k, arr.slice());
+      else arr.forEach((v, i) => { if (isFinite(v)) cur[i] = v; });
+    }
+  }
+  const p0 = parts[0], meters = new Set(parts.map(p => p.meta.meter));
+  const ratio = p0.vtP && p0.vtS ? p0.vtP / p0.vtS : NaN;
+  const keys = [...new Set([...data.A.keys(), ...data.B.keys(), ...data.C.keys()])].sort();
+  const count = ph => { let c = 0; for (const a of data[ph].values()) for (const v of a) if (isFinite(v)) c++; return c; };
+  const avail = ["A", "B", "C"].filter(ph => count(ph) > n * 0.2);
+  if (!avail.length) throw new Error("ไม่มีค่าแรงดันในไฟล์");
+  // secondary volts -> primary volts
+  let k = ratio > 1 ? ratio : 1;
+  if (!(ratio > 1)) { // no VT ratio: guess from magnitude
+    const any = [...data[avail[0]].values()][0].find(v => isFinite(v));
+    k = any < 100 ? 1000 : 1;
+  }
+  const stats = {};
+  for (const ph of avail) {
+    let lo = Infinity, hi = -Infinity, s = 0, c = 0;
+    for (const a of data[ph].values()) for (const v of a) if (isFinite(v)) { lo = Math.min(lo, v); hi = Math.max(hi, v); s += v; c++; }
+    stats[ph] = { lo: lo * k, hi: hi * k, mean: s / c * k, n: c };
+  }
+  return { kind: "amr", meta: p0.meta, meters: [...meters], data, keys, avail, k, stats, n, name: names.join(", ") };
+}
+// build the HV series (primary V) for the chosen phase mode, fill gaps
+function amrSeries(h, mode) {
+  const first = keyDate(h.keys[0]), last = keyDate(h.keys[h.keys.length - 1]);
+  const nd = Math.round((last - first) / 86400000) + 1, flat = new Float64Array(nd * 96).fill(NaN);
+  for (let d = 0; d < nd; d++) {
+    const key = dateKeyOf(first + d * 86400000);
+    const arrs = h.avail.map(ph => h.data[ph].get(key)).filter(Boolean);
+    for (let s2 = 0; s2 < 96; s2++) {
+      const v = arrs.map(a => a[s2]).filter(x => isFinite(x));
+      const pick = mode === "max" ? (v.length ? Math.max(...v) : NaN) : mode === "avg" ? (v.length ? v.reduce((a, b) => a + b, 0) / v.length : NaN)
+        : (h.data[mode].get(key) || [])[s2];
+      flat[d * 96 + s2] = isFinite(pick) ? pick * h.k : NaN;
+    }
+  }
+  // typical day (mean per slot) for long gaps and dates outside the file
+  const profile = new Float64Array(96);
+  for (let s2 = 0; s2 < 96; s2++) { let a = 0, c = 0; for (let d = 0; d < nd; d++) { const v = flat[d * 96 + s2]; if (isFinite(v)) { a += v; c++; } } profile[s2] = c ? a / c : NaN; }
+  let missing = 0, interp = 0;
+  for (let i = 0; i < flat.length; i++) {
+    if (isFinite(flat[i])) continue;
+    let j = i; while (j < flat.length && !isFinite(flat[j])) j++;
+    const gap = j - i; missing += gap;
+    const a = i > 0 ? flat[i - 1] : NaN, b = j < flat.length ? flat[j] : NaN;
+    for (let q = i; q < j; q++) {
+      if (gap <= 8 && isFinite(a) && isFinite(b)) { flat[q] = a + (b - a) * (q - i + 1) / (gap + 1); interp++; } // up to 2 h: straight line
+      else flat[q] = profile[q % 96];
+    }
+    i = j - 1;
+  }
+  let lo = Infinity, hi = -Infinity, sum = 0;
+  for (const v of flat) { lo = Math.min(lo, v); hi = Math.max(hi, v); sum += v; }
+  return { first, nd, flat, profile, missing, interp, lo, hi, mean: sum / flat.length };
+}
+const PH_NAME = { avg: "เฉลี่ยทุกเฟสที่มีข้อมูล", max: "สูงสุดของทุกเฟส (กรณีแย่สุด)", A: "Phase A", B: "Phase B", C: "Phase C" };
+function applyAmrPhase() {
+  const h = hvData; if (!h || h.kind !== "amr") return;
+  const ser = amrSeries(h, $("hvPh").value);
+  Object.assign(h, { ser, lo: ser.lo, hi: ser.hi, mean: ser.mean, phaseMode: $("hvPh").value });
+  const days = ser.nd, x = Array.from(ser.flat, (_, i) => i / 96);
+  const monthTicks = [];
+  for (let d = 0; d < days; d++) { const dt = new Date(ser.first + d * 86400000); if (dt.getUTCDate() === 1 || d === 0) monthTicks.push(d); }
+  hvPrev.set({ x, xMin: 0, xMax: days, xTicks: monthTicks, xFmt: t => { const dt = new Date(ser.first + Math.round(t) * 86400000); return `${dt.getUTCDate()} ${TH_MONTH[dt.getUTCMonth()]}`; },
+    tipHead: i => { const dt = new Date(ser.first + Math.floor(i / 96) * 86400000); return `${dt.getUTCDate()} ${TH_MONTH[dt.getUTCMonth()]} ${fmtHM((i % 96) / 4)}`; },
+    tipFmt: v => (v / 1000).toFixed(2) + " kV", series: [{ y: ser.flat, color: cssVar("--hv"), width: 1, name: PH_NAME[h.phaseMode] }] });
+  $("hvPrevWrap").hidden = false;
+  const cover = h.keys.length;
+  $("hvStat").innerHTML = `<b>${h.n.toLocaleString()}</b> จุด · ${cover} วัน · ขาดหาย <b>${ser.missing}</b> จุด (เติมเส้นตรง ${ser.interp}, ใช้โปรไฟล์เฉลี่ย ${ser.missing - ser.interp})<br>`
+    + `แรงสูง ${PH_NAME[h.phaseMode]}: ต่ำสุด <b>${(ser.lo / 1000).toFixed(2)}</b> · เฉลี่ย <b>${(ser.mean / 1000).toFixed(2)}</b> · สูงสุด <b>${(ser.hi / 1000).toFixed(2)}</b> kV`;
+  $("hvStat").style.color = "";
+  markStale();
+}
+function showAmr(h) {
+  const m = h.meta, esc = t => String(t ?? "—").replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+  const d0 = h.keys[0].split("-"), d1 = h.keys[h.keys.length - 1].split("-");
+  $("amrInfo").innerHTML = `<span>ผู้ใช้ไฟ</span><b>${esc(m.customer)}</b><span>บัญชี / มิเตอร์</span><b class="num">${esc(m.account)} / ${esc(h.meters.join(", "))}</b>`
+    + `<span>VT · CT</span><b class="num">${esc(m.vt)} · ${esc(m.ct)}</b><span>ช่วงข้อมูล</span><b>${+d0[2]} ${TH_MONTH[d0[1] - 1]} – ${+d1[2]} ${TH_MONTH[d1[1] - 1]} ${+d1[0] + 543}</b>`
+    + `<div class="ph tablewrap"><table><thead><tr><th>เฟส</th><th>ต่ำสุด kV</th><th>เฉลี่ย kV</th><th>สูงสุด kV</th></tr></thead><tbody>`
+    + h.avail.map(ph => `<tr><td>Phase ${ph}</td><td>${(h.stats[ph].lo / 1000).toFixed(2)}</td><td>${(h.stats[ph].mean / 1000).toFixed(2)}</td><td>${(h.stats[ph].hi / 1000).toFixed(2)}</td></tr>`).join("")
+    + `</tbody></table></div>`;
+  $("amrInfo").hidden = false;
+  const sel = $("hvPh");
+  if (h.avail.length === 1) sel.innerHTML = `<option value="${h.avail[0]}">${PH_NAME[h.avail[0]]}</option>`;
+  else sel.innerHTML = ["avg", "max", ...h.avail].map(v => `<option value="${v}">${PH_NAME[v]}</option>`).join("");
+  $("hvPhF").hidden = false;
+}
+// align the analysis to the meter: nominal HV from the VT primary, dates from the data (max 120 days)
+function alignToAmr(h) {
+  const notes = [];
+  if (h.meta.vt && isFinite(parseFloat(h.meta.vt))) {
+    const kv = parseFloat(h.meta.vt.replace(/,/g, "")) / 1000;
+    if (Math.abs(hvNomV() / 1000 - kv) > 0.01) {
+      const u = UTIL[utilKey()];
+      if (u.hv && u.hv.includes(kv)) $("hvNom").value = kv;
+      else { document.querySelector('input[name="util"][value="custom"]').checked = true; $("hvCust").value = kv; onUtilChange(); }
+      notes.push(`ตั้งแรงดันระบุแรงสูงเป็น ${kv} kV ตาม VT`);
+    }
+  }
+  const last = h.keys[h.keys.length - 1];
+  let first = h.keys[0];
+  if ((keyDate(last) - keyDate(first)) / 86400000 + 1 > 120) { first = dateKeyOf(keyDate(last) - 119 * 86400000); notes.push("ใช้ 120 วันล่าสุด"); }
+  $("d0").value = first; $("d1").value = last;
+  notes.push(`ช่วงวันที่ ${first} ถึง ${last}`);
+  updateHvLabels(); updateSun();
+  return notes;
+}
+async function loadHvFiles(files) {
   const stat = $("hvStat");
+  files = Array.from(files);
   try {
-    const d = parseHvCsv(await file.text());
-    hvData = { ...d, name: file.name };
-    stat.innerHTML = `<b>${file.name}</b> · ${d.values.length} จุด (${d.days} วัน)${d.kv ? " · แปลง kV→V" : ""}<br>ต่ำสุด <b>${d.lo.toFixed(0)}</b> · เฉลี่ย <b>${d.mean.toFixed(0)}</b> · สูงสุด <b>${d.hi.toFixed(0)}</b> V`;
+    const texts = await Promise.all(files.map(f => f.text()));
+    if (texts.some(isAmrText)) {
+      const parts = texts.map((t, i) => { if (!isAmrText(t)) throw new Error(`${files[i].name} ไม่ใช่รายงานแรงดัน AMR`); return parseAmr(t); });
+      hvData = mergeAmr(parts, files.map(f => f.name));
+      showAmr(hvData);
+      const notes = alignToAmr(hvData);
+      const err = hvRangeErr({ lo: Math.min(...hvData.avail.map(p => hvData.stats[p].lo)), hi: Math.max(...hvData.avail.map(p => hvData.stats[p].hi)) });
+      if (err) throw new Error(err);
+      applyAmrPhase();
+      stat.innerHTML += `<br>${notes.join(" · ")}`;
+      return;
+    }
+    if (files.length > 1) throw new Error("ไฟล์ CSV ให้เลือกครั้งละ 1 ไฟล์");
+    const d = parseHvCsv(texts[0]);
+    hvData = { ...d, name: files[0].name };
+    $("amrInfo").hidden = true; $("hvPhF").hidden = true;
+    stat.innerHTML = `<b>${files[0].name}</b> · ${d.values.length} จุด (${d.days} วัน)${d.kv ? " · แปลง kV→V" : ""}<br>ต่ำสุด <b>${d.lo.toFixed(0)}</b> · เฉลี่ย <b>${d.mean.toFixed(0)}</b> · สูงสุด <b>${d.hi.toFixed(0)}</b> V`;
     stat.style.color = "";
     $("hvPrevWrap").hidden = false;
     const x = d.values.map((_, i) => i / 4);
@@ -1196,15 +1377,16 @@ async function loadHvFile(file) {
       series: [{ y: d.values, color: cssVar("--hv"), width: 1.4, name: hvTxt() }] });
     markStale();
   } catch (err) {
-    hvData = null; $("hvPrevWrap").hidden = true;
+    hvData = null; $("hvPrevWrap").hidden = true; $("amrInfo").hidden = true; $("hvPhF").hidden = true;
     stat.textContent = `นำเข้าไม่สำเร็จ: ${err.message}`; stat.style.color = "var(--over)";
   }
 }
-$("hvFile").addEventListener("change", e => { const f = e.target.files[0]; if (f) loadHvFile(f); });
+$("hvPh").addEventListener("change", applyAmrPhase);
+$("hvFile").addEventListener("change", e => { if (e.target.files.length) loadHvFiles(e.target.files); });
 const hvBox = $("hvBox");
 hvBox.addEventListener("dragover", e => { e.preventDefault(); hvBox.classList.add("drag"); });
 hvBox.addEventListener("dragleave", () => hvBox.classList.remove("drag"));
-hvBox.addEventListener("drop", e => { e.preventDefault(); hvBox.classList.remove("drag"); const f = e.dataTransfer.files[0]; if (f) loadHvFile(f); });
+hvBox.addEventListener("drop", e => { e.preventDefault(); hvBox.classList.remove("drag"); if (e.dataTransfer.files.length) loadHvFiles(e.dataTransfer.files); });
 $("hvTpl").addEventListener("click", () => {
   // ตัวอย่าง: โปรไฟล์ 22 kV หนึ่งวัน แรงดันตกช่วงหัวค่ำ (โหลดสูงสุด) และยกขึ้นช่วงเที่ยง
   const rows = ["time,hv"], vn = hvNomV();
@@ -1301,11 +1483,25 @@ async function run(e) {
       state.busy = false; $("runBtn").disabled = false; return;
     }
     hv = new Float64Array(days * 96);
-    for (let k = 0; k < hv.length; k++) hv[k] = hvData.values[k % hvData.values.length];
-    log(`HV ${hvTxt().padEnd(15)}: CSV "${hvData.name}" (${hvData.days} day profile${hvData.days > 1 ? "s" : ""}, cycled)`);
+    if (hvData.kind === "amr") {
+      const ser = hvData.ser, t0d = Date.UTC(s0.y, s0.m - 1, s0.d);
+      let outside = 0;
+      for (let k = 0; k < hv.length; k++) {
+        const di = Math.round((t0d - ser.first) / 86400000) + Math.floor(k / 96);
+        if (di >= 0 && di < ser.nd) hv[k] = ser.flat[di * 96 + k % 96];
+        else { hv[k] = ser.profile[k % 96]; outside++; }
+      }
+      log(`HV ${hvTxt().padEnd(15)}: AMR meter ${hvData.meters.join(", ")} · VT ${hvData.meta.vt || "-"} · ${PH_NAME[hvData.phaseMode]}`);
+      log(`                     ${hvData.keys.length} days measured, ${hvData.ser.missing} gaps filled${outside ? `, ${outside} points outside file -> typical day` : ""}`);
+    } else {
+      for (let k = 0; k < hv.length; k++) hv[k] = hvData.values[k % hvData.values.length];
+      log(`HV ${hvTxt().padEnd(15)}: CSV "${hvData.name}" (${hvData.days} day profile${hvData.days > 1 ? "s" : ""}, cycled)`);
+    }
   } else log(`HV ${hvTxt().padEnd(15)}: simulated, +${(+$("hvSun").value).toFixed(1)}% per 1000 W/m2 of local irradiance`);
   const rows = buildDataset({ lat, lon, trafo, pv, target, hv, hvNom: hvNomV(), hvSun: hv ? 0 : +$("hvSun").value / 100, vScale: ph.nominal / 400, noiseKw: ph === PHASE[1] ? 5 * trafo / 500 : 5, start: s0, days, cloud: +$("cloud").value / 100, ghi });
-  const P = prepare(rows);
+  // measured HV is a real driver of the LV voltage: give it to the LSTM as an extra input
+  const P = prepare(rows, hv ? FEATURES.concat("v22") : FEATURES);
+  log(`Features           : ${P.features.join(", ")}`);
   log(`Samples            : ${rows.length}  (train ${P.train.length} / test ${P.test.length})`);
   log("");
   log("[i] Training LSTM Network... (Please wait)");
@@ -1336,7 +1532,8 @@ async function run(e) {
   const all = P.train.concat(P.test), pred = predTr.concat(predTe);
   const dayList = [];
   for (let i = 0; i + 96 <= all.length; i += 96) dayList.push({ start: i, set: i < P.split ? "train" : "test", r: all[i] });
-  state.model = { all, pred, dayList, split: P.split, history, mTr, mTe, trafo, pv, hvName: hv ? hvData.name : "", hvSun: +$("hvSun").value, hvTxt: hvTxt(),
+  state.model = { all, pred, dayList, split: P.split, history, mTr, mTe, trafo, pv, hvName: hv ? (hvData.kind === "amr" ? `AMR มิเตอร์ ${hvData.meters.join(", ")} (${PH_NAME[hvData.phaseMode]})` : hvData.name) : "",
+    amr: hv && hvData.kind === "amr" ? { ...hvData.meta, meters: hvData.meters, days: hvData.keys.length, missing: hvData.ser.missing } : null, hvSun: +$("hvSun").value, hvTxt: hvTxt(),
     util: utilKey(), phase: phaseCfg().nominal === 230 ? 1 : 3, lat, lon, site: $("siteName").textContent,
     period: `${$("d0").value} ถึง ${$("d1").value}`, sunSrc: ghi ? "Open-Meteo (ข้อมูลจริง)" : `แบบจำลองท้องฟ้า เมฆ ${$("cloud").value}%` };
   $("pdfBtn").disabled = false;
@@ -1355,7 +1552,7 @@ async function run(e) {
   fillDaySelect();
   renderDay();
   state.busy = false; $("runBtn").disabled = false; $("runBtn").textContent = "จำลองและฝึก LSTM";
-  setStatus("ok", ghi ? "เสร็จ · ข้อมูลแดดจริง" : "เสร็จ · แบบจำลอง");
+  setStatus("ok", `เสร็จ · แดด${ghi ? "จริง" : "จำลอง"} · แรงสูง${hv ? (hvData.kind === "amr" ? " AMR" : " CSV") : "จำลอง"}`);
 }
 $("cfg").addEventListener("submit", run);
 
@@ -1387,6 +1584,18 @@ function syncSet() {
   document.querySelector(`input[name="set"][value="${d.set}"]`).checked = true;
 }
 
+// one fixed tap for the whole forecast period (off-load taps are not moved day by day)
+function periodBest(vmin, vmax) {
+  const m = state.model, tot = [0, 0, 0, 0, 0], over = [0, 0, 0, 0, 0], under = [0, 0, 0, 0, 0];
+  let days = 0;
+  for (const d of m.dayList) {
+    if (d.set !== "test") continue;
+    days++;
+    analyze(m.pred.slice(d.start, d.start + 96), vmin, vmax).res.forEach((r, i) => { tot[i] += r.total; over[i] += r.over; under[i] += r.under; });
+  }
+  let best = 0; tot.forEach((t, i) => { if (t < tot[best]) best = i; });
+  return { best, tot, over, under, days };
+}
 function renderSchedule(vmin, vmax) {
   const m = state.model, wrap = $("schedule");
   wrap.innerHTML = "";
@@ -1403,7 +1612,8 @@ function renderSchedule(vmin, vmax) {
     wrap.append(b);
   });
   const top = bestCounts.indexOf(Math.max(...bestCounts));
-  $("schedSub").textContent = `กรอบเส้นประ = ชุดฝึกสอน · ช่วงพยากรณ์ใช้ ${TAP_LABELS[top]} บ่อยที่สุด (${bestCounts[top]}/${bestCounts.reduce((a, b) => a + b, 0)} วัน)`;
+  const pb = periodBest(vmin, vmax);
+  $("schedSub").innerHTML = `กรอบเส้นประ = ชุดฝึกสอน · ถ้าตั้งแท็ปเดียวตลอด ${pb.days} วันพยากรณ์ <b>${TAP_LABELS[pb.best]}</b> ดีที่สุด (หลุดเกณฑ์รวม ${pb.tot[pb.best]} นาที, Tap 3 รวม ${pb.tot[2]} นาที)`;
   const cur = wrap.children[state.dayIdx];
   if (cur) wrap.scrollLeft = cur.offsetLeft - wrap.clientWidth / 2 + cur.clientWidth / 2;
 }
@@ -1499,8 +1709,8 @@ class ReportDoc {
     }
     this.y += gap;
   }
-  heading(str, num) {
-    this.ensure(90); // keep the heading with the start of its section
+  heading(str, num, need = 90) {
+    this.ensure(need); // keep the heading with the start of its section
     this.y += 6;
     const g = this.g;
     if (num) {
@@ -1527,18 +1737,26 @@ class ReportDoc {
     };
     if (keep) this.ensure(rowH * (rows.length + 1) + 8);
     if (head) { this.ensure(rowH * 2); drawHead(); }
+    const lh = size * 1.45;
     rows.forEach((r, ri) => {
-      if (this.ensure(rowH) && head) drawHead();
-      if (ri === hl) { G().fillStyle = RC.accentSoft; G().fillRect(PM, this.y, W, rowH); }
-      G().strokeStyle = RC.line; G().lineWidth = 0.6; G().beginPath(); G().moveTo(PM, this.y + rowH); G().lineTo(PM + W, this.y + rowH); G().stroke();
+      // wrap long cells: the row grows to fit its tallest cell
+      const cells = cols.map((c, i) => {
+        this.setFont(size, ri === hl && i === 0 ? 700 : 400, !!c.mono);
+        const t = typeof r[i] === "object" && r[i] ? r[i].t : String(r[i]);
+        return this.lines(t, c.w * W - 12);
+      });
+      const h = Math.max(rowH, Math.max(...cells.map(l => l.length)) * lh + (rowH - lh));
+      if (this.ensure(h) && head) drawHead();
+      if (ri === hl) { G().fillStyle = RC.accentSoft; G().fillRect(PM, this.y, W, h); }
+      G().strokeStyle = RC.line; G().lineWidth = 0.6; G().beginPath(); G().moveTo(PM, this.y + h); G().lineTo(PM + W, this.y + h); G().stroke();
       cols.forEach((c, i) => {
         this.setFont(size, ri === hl && i === 0 ? 700 : 400, !!c.mono);
         G().fillStyle = ri === hl && i === 0 ? RC.accent : (typeof r[i] === "object" && r[i] && r[i].color) || RC.ink;
-        const t = typeof r[i] === "object" && r[i] ? r[i].t : String(r[i]);
         G().textAlign = c.align || "left"; G().textBaseline = "middle";
-        G().fillText(t, c.align === "right" ? xs[i] + c.w * W - 6 : c.align === "center" ? xs[i] + c.w * W / 2 : xs[i] + 6, this.y + rowH / 2);
+        const x = c.align === "right" ? xs[i] + c.w * W - 6 : c.align === "center" ? xs[i] + c.w * W / 2 : xs[i] + 6;
+        cells[i].forEach((ln, k) => G().fillText(ln, x, this.y + rowH / 2 + k * lh));
       });
-      this.y += rowH;
+      this.y += h;
     });
     this.y += 8;
   }
@@ -1607,7 +1825,9 @@ async function makeReport() {
   try { await document.fonts.ready; } catch (e) { /* fonts optional */ }
   const { target, tol, vmin, vmax } = band();
   const d = m.dayList[state.dayIdx], rows = m.all.slice(d.start, d.start + 96), pred = m.pred.slice(d.start, d.start + 96);
-  const { res, best } = analyze(pred, vmin, vmax);
+  const { res } = analyze(pred, vmin, vmax);
+  // the whole report uses one tap: the best single setting over the forecast period
+  const pb = periodBest(vmin, vmax), best = pb.best;
   const now = new Date(), stamp = `${now.getDate()} ${TH_MONTH[now.getMonth()]} ${now.getFullYear() + 543} ${pad2(now.getHours())}:${pad2(now.getMinutes())} น.`;
   const doc = new ReportDoc(), g = () => doc.g;
   const vLabel = m.phase === 3 ? "แรงดันระหว่างสาย" : "แรงดันเฟส-นิวทรัล";
@@ -1631,15 +1851,18 @@ async function makeReport() {
     ? `หลังปรับเป็น ${TAP_LABELS[best]}: แรงดันอยู่ระหว่าง ${rb.lo.toFixed(1)}–${rb.hi.toFixed(1)} V อยู่ในเกณฑ์ตลอดวัน`
     : `หลังปรับเป็น ${TAP_LABELS[best]}: ยังหลุดเกณฑ์ ${rb.total} นาที${bestOver.length ? ` (เกินช่วง ${bestOver.join(", ")} น.)` : ""}${bestUnder.length ? ` (ต่ำช่วง ${bestUnder.join(", ")} น.)` : ""} ควรพิจารณาวิธีอื่นร่วมด้วย เช่น ควบคุมกำลังรีแอคทีฟของอินเวอร์เตอร์`);
   else pts.push("ไม่ต้องปรับแท็ป คงไว้ที่ Tap 3");
+  const share = pb.tot[pb.best] / (pb.days * 1440) * 100;
+  pts.unshift(`ตลอดช่วงพยากรณ์ ${pb.days} วัน ถ้าตั้งแท็ปเดียวไว้ที่ ${TAP_LABELS[pb.best]} แรงดันหลุดเกณฑ์รวม ${pb.tot[pb.best]} นาที (${share.toFixed(1)}% ของเวลา) เทียบกับ Tap 3 รวม ${pb.tot[2]} นาที`);
+  pts.splice(1, 0, `ตัวอย่างวันที่ ${fmtDay(d.r)}:`);
   doc.setFont(10.5);
-  const ptLines = pts.map(t => doc.lines("• " + t, PW - 2 * PM - 28));
+  const ptLines = pts.map((t, i) => doc.lines((i === 1 ? "" : "• ") + t, PW - 2 * PM - 28));
   const boxH = 64 + ptLines.reduce((a, l) => a + l.length, 0) * 16;
-  const ok = rb.total === 0;
+  const ok = pb.tot[pb.best] === 0;
   g().fillStyle = ok ? RC.accentSoft : RC.warnSoft; g().strokeStyle = ok ? RC.accent : RC.warn; g().lineWidth = 1.2;
   g().beginPath(); g().roundRect(PM, doc.y, PW - 2 * PM, boxH, 8); g().fill(); g().stroke();
-  doc.setFont(10, 600); g().fillStyle = ok ? RC.accent : RC.warn; g().fillText("คำแนะนำ", PM + 14, doc.y + 12);
+  doc.setFont(10, 600); g().fillStyle = ok ? RC.accent : RC.warn; g().fillText(`คำแนะนำ (แท็ปเดียวสำหรับช่วงพยากรณ์ ${pb.days} วัน)`, PM + 14, doc.y + 12);
   doc.setFont(22, 700); g().fillStyle = RC.ink;
-  g().fillText(best === 2 ? "คงแท็ปไว้ที่ " + tapName(2) : "ให้ตั้งแท็ปที่ " + tapName(best), PM + 14, doc.y + 28);
+  g().fillText(pb.best === 2 ? "คงแท็ปไว้ที่ " + tapName(2) : "ให้ตั้งแท็ปที่ " + tapName(pb.best), PM + 14, doc.y + 28);
   let yy = doc.y + 60;
   doc.setFont(10.5); g().fillStyle = RC.ink;
   for (const ls of ptLines) for (const ln of ls) { g().fillText(ln, PM + 14, yy); yy += 16; }
@@ -1656,12 +1879,13 @@ async function makeReport() {
     ["อินเวอร์เตอร์ PV", `${m.pv} kW`],
     ["มาตรฐานแรงดันที่ตู้ MDB", `${target} V ±${tol}% → ยอมรับ ${vmin.toFixed(1)}–${vmax.toFixed(1)} V (${vLabel})`],
     ["แรงดันแรงสูง", m.hvName ? `นำเข้าจากไฟล์ ${m.hvName}` : `จำลองจากแดดในพื้นที่ (+${m.hvSun.toFixed(1)}% ต่อ 1,000 W/m²)`],
+    ...(m.amr ? [["มิเตอร์ AMR (แรงสูง)", `${m.amr.customer || "-"} · บัญชี ${m.amr.account || "-"} · มิเตอร์ ${m.amr.meters.join(", ")} · VT ${m.amr.vt || "-"} · CT ${m.amr.ct || "-"} · ${m.amr.days} วัน (ข้อมูลขาด ${m.amr.missing} จุด)`]] : []),
     ["ข้อมูลแสงแดด / ช่วงข้อมูล", `${m.sunSrc} · ${m.period}`],
     ["ความแม่นยำของ LSTM", `คลาดเคลื่อนเฉลี่ย (RMSE) ${m.mTe.rmse.toFixed(2)} V · MAE ${m.mTe.mae.toFixed(2)} V (ชุดทดสอบ)`]
   ], { size: 9.5, rowH: 18 });
 
   // ----- MDB voltage chart -----
-  doc.heading(`แรงดันที่ตู้ MDB วันที่ ${fmtDay(d.r)}: ก่อนและหลังปรับแท็ป`, 2);
+  doc.heading(`แรงดันที่ตู้ MDB วันที่ ${fmtDay(d.r)}: ก่อนและหลังปรับแท็ป`, 2, 250);
   const x = rows.map(r => r.hour), base = { x, xMin: 0, xMax: 23.75, xTicks: [0, 3, 6, 9, 12, 15, 18, 21, 23.75], xFmt: fmtHM };
   const lim = [{ y: vmin, color: RC.over }, { y: vmax, color: RC.over }];
   const cw = PW - 2 * PM;
@@ -1687,20 +1911,21 @@ async function makeReport() {
     return [fmtDay(dd.r), tapName(a.best), { t: String(rb2.total), color: rb2.total ? RC.over : RC.ink }, a.res[2].total, `${rb2.lo.toFixed(1)} – ${rb2.hi.toFixed(1)}`];
   });
   const topTap = counts.indexOf(Math.max(...counts));
-  doc.para(`ใน ${sched.length} วันที่พยากรณ์ ตำแหน่งที่เหมาะสมที่สุดบ่อยที่สุดคือ ${tapName(topTap)} (${counts[topTap]} วัน) หม้อแปลงชนิดปรับแท็ปขณะไม่มีไฟปรับบ่อยไม่ได้ ให้เลือกตำแหน่งเดียวที่ใช้ได้กับทุกวันในช่วงนี้`, { size: 10, color: RC.muted });
+  doc.para(`แท็ปที่ดีที่สุดของแต่ละวันอาจต่างกัน แต่หม้อแปลงชนิดปรับแท็ปขณะไม่มีไฟปรับบ่อยไม่ได้ จึงแนะนำแท็ปเดียวที่ทำให้นาทีหลุดเกณฑ์รวมทั้ง ${pb.days} วันน้อยที่สุด คือ ${tapName(pb.best)} (รวม ${pb.tot[pb.best]} นาที: ต่ำกว่าเกณฑ์ ${pb.under[pb.best]} · เกินเกณฑ์ ${pb.over[pb.best]}) วันที่ดีที่สุดบ่อยที่สุดคือ ${tapName(topTap)} (${counts[topTap]} วัน)`, { size: 10, color: RC.muted });
   doc.table([{ label: "วันที่", w: 0.18 }, { label: "แท็ปแนะนำ", w: 0.24 }, { label: "หลุดเกณฑ์ (นาที)", w: 0.2, align: "right" }, { label: "ถ้าใช้ Tap 3 (นาที)", w: 0.2, align: "right" }, { label: "ช่วงแรงดัน V", w: 0.18, align: "right" }], sched, { rowH: 17 });
 
   // ----- sunlight + HV -----
-  doc.heading(`สาเหตุ: แสงแดดและแรงดันแรงสูง ${m.hvTxt} วันที่ ${fmtDay(d.r)}`, 5);
+  doc.heading(`สาเหตุ: แสงแดดและแรงดันแรงสูง ${m.hvTxt} วันที่ ${fmtDay(d.r)}`, 5, 170);
   doc.image(chartImage({ ...base, yMin0: true, series: [{ y: rows.map(r => r.sunlight * 1000), color: RC.sun, fill: "rgba(201,138,11,.2)", width: 1.5, name: "แดด" }] }, cw, 110, RP, PS), 110, [["ความเข้มแสงอาทิตย์ (W/m²)", RC.sun]]);
   doc.image(chartImage({ ...base, series: [{ y: rows.map(r => r.v22), color: RC.hv, width: 1.8, name: m.hvTxt }] }, cw, 110, RP, PS), 110, [[`แรงดันแรงสูง ${m.hvTxt} (V)`, RC.hv]]);
-  doc.para("แดดแรงช่วงกลางวันทำให้ PV จ่ายไฟย้อนเข้าระบบ แรงดันจึงสูงขึ้นช่วงเที่ยง ส่วนช่วงหัวค่ำโหลดสูงและไม่มีแดด แรงดันจึงลดลง การปรับแท็ปเลื่อนแรงดันทั้งวันขึ้นหรือลงเท่ากันเป็นเปอร์เซ็นต์", { size: 10, color: RC.muted });
+  doc.para((m.amr ? `แรงดันแรงสูงในกราฟเป็นค่าวัดจริงจากมิเตอร์ AMR แปลงด้วยอัตราส่วน VT ${m.amr.vt || ""} แรงดันด้านแรงสูงที่เปลี่ยนไปจะส่งผ่านหม้อแปลงไปยังตู้ MDB ในสัดส่วนเดียวกัน ` : "")
+    + "แดดแรงช่วงกลางวันทำให้ PV จ่ายไฟย้อนเข้าระบบ แรงดันจึงสูงขึ้นช่วงเที่ยง ส่วนช่วงหัวค่ำโหลดสูงและไม่มีแดด แรงดันจึงลดลง การปรับแท็ปเลื่อนแรงดันทั้งวันขึ้นหรือลงเท่ากันเป็นเปอร์เซ็นต์", { size: 10, color: RC.muted });
 
   // ----- work steps -----
   doc.heading("ขั้นตอนสำหรับพนักงานช่าง", 6);
-  const target3 = best === 2 ? "Tap 3" : TAP_LABELS[best];
+  const target3 = TAP_LABELS[pb.best];
   const steps = [
-    `ตรวจป้ายชื่อหม้อแปลง (nameplate): รายงานนี้ถือว่า Tap 1 ให้แรงดันแรงต่ำ −5%, Tap 2 −2.5%, Tap 3 เท่าแรงดันระบุ, Tap 4 +2.5% และ Tap 5 +5% ถ้าป้ายชื่อเรียงลำดับต่างออกไป ให้เลือกตำแหน่งที่ได้แรงดันแรงต่ำ ${TAP_STEPS[best] > 0 ? "+" : ""}${(TAP_STEPS[best] * 100).toFixed(1)}%`,
+    `ตรวจป้ายชื่อหม้อแปลง (nameplate): รายงานนี้ถือว่า Tap 1 ให้แรงดันแรงต่ำ −5%, Tap 2 −2.5%, Tap 3 เท่าแรงดันระบุ, Tap 4 +2.5% และ Tap 5 +5% ถ้าป้ายชื่อเรียงลำดับต่างออกไป ให้เลือกตำแหน่งที่ได้แรงดันแรงต่ำ ${TAP_STEPS[pb.best] > 0 ? "+" : ""}${(TAP_STEPS[pb.best] * 100).toFixed(1)}%`,
     "วัดและบันทึกแรงดันที่ตู้ MDB ก่อนปรับ ทุกเฟส",
     "หม้อแปลงจำหน่ายส่วนใหญ่ปรับแท็ปขณะไม่มีไฟ (Off-circuit) ต้องขออนุญาตดับไฟ ปลดวงจรทั้งด้านแรงสูงและแรงต่ำ ตรวจสอบว่าไม่มีไฟ และต่อลงดินตามระเบียบความปลอดภัยก่อนทำงาน",
     `หมุนสวิตช์แท็ปไปที่ ${target3} ให้ลงล็อก แล้วล็อกกลไกให้แน่น`,
@@ -1721,7 +1946,7 @@ async function makeReport() {
   // ----- measurement record -----
   doc.heading("บันทึกผลการวัดแรงดันที่ตู้ MDB (V)", 7);
   const phCols = m.phase === 3 ? ["L1-L2", "L2-L3", "L3-L1"] : ["L-N"];
-  const cols = [{ label: "ช่วงเวลา", w: 0.28 }, { label: "เวลาที่วัด", w: 0.14 }, ...phCols.map(p => ({ label: p, w: (0.36) / phCols.length, align: "center" })), { label: "ตำแหน่งแท็ป", w: 0.22 }];
+  const cols = [{ label: "ช่วงเวลา", w: 0.36 }, { label: "เวลาที่วัด", w: 0.13 }, ...phCols.map(p => ({ label: p, w: 0.36 / phCols.length, align: "center" })), { label: "แท็ป", w: 0.15 }];
   const blank = new Array(cols.length - 1).fill("");
   doc.table(cols, [["ก่อนปรับ", ...blank], ["หลังปรับ ช่วงเที่ยง (11:00–13:00)", ...blank], ["หลังปรับ ช่วงหัวค่ำ (18:00–20:00)", ...blank]], { rowH: 26 });
   doc.ensure(70);
