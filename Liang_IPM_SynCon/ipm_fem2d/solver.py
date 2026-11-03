@@ -209,7 +209,10 @@ class MagnetostaticModel:
         sgn = np.zeros(ne)
         nr = len(m.r_tri)                                  # rotor elements come first
         sgn[:nr][mag[:nr]] = mc.magnet_sign(d, m.r_tag[mag[:nr]])
-        ux, uy = sgn * np.cos(th0), sgn * np.sin(th0)
+        ux, uy = sgn * np.cos(th0), sgn * np.sin(th0)              # radial (arc magnets)
+        if getattr(m, "r_mdir", None) is not None:                 # parallel (flat magnets)
+            ux[:nr] = np.where(mag[:nr], m.r_mdir[:, 0], ux[:nr])
+            uy[:nr] = np.where(mag[:nr], m.r_mdir[:, 1], uy[:nr])
         nu_m = NU0 / d.mu_rm
         fe = 0.5 * nu_m * (ux[:, None] * c - uy[:, None] * b)       # (ne, 3)
         fe[~mag] = 0.0

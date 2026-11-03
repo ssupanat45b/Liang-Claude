@@ -11,7 +11,7 @@ import math
 import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
-from matplotlib.patches import Circle, Wedge
+from matplotlib.patches import Circle, Polygon, Wedge
 
 from .machine import PMDesign, fmt_q, fmt_v, winding_layout
 
@@ -63,6 +63,14 @@ def draw_section(ax, d: PMDesign, rot: float = 0.0, labels: bool = False):
                 ax.text(r * math.cos(am), r * math.sin(am), "ABC"[ph] + ("+" if sg > 0 else "−"),
                         fontsize=4.5, color="w", ha="center", va="center",
                         rotation=math.degrees(am) - 90)
+    if d.magnet_shape == "rect":
+        from .rotor_rect import pole_polygons
+        for kp in range(d.poles):
+            mag, bu, bl = pole_polygons(d, kp, math.radians(rot))
+            for bar in (bu, bl):
+                ax.add_patch(Polygon(bar, closed=True, fc=C_BARRIER, ec="k", lw=0.4))
+            ax.add_patch(Polygon(mag, closed=True, fc=C_MAG_N if kp % 2 == 0 else C_MAG_S, ec="k", lw=0.5))
+        return
     for kp in range(d.poles):
         c = kp * g["pole_deg"] + rot
         m0, m1 = c - g["mag_deg"] / 2, c + g["mag_deg"] / 2
@@ -71,6 +79,11 @@ def draw_section(ax, d: PMDesign, rot: float = 0.0, labels: bool = False):
         for b0, b1 in ((m0 - g["bar_deg"], m0), (m1, m1 + g["bar_deg"])):      # flux barriers
             ax.add_patch(Wedge((0, 0), g["R_bridge"], b0, b1, width=g["R_bridge"] - g["R_core"],
                                fc=C_BARRIER, ec="k", lw=0.4))
+
+
+def _rect_w(d):
+    from .rotor_rect import layout
+    return layout(d)["w"]
 
 
 def _dim(ax, p1, p2, text, off=(0, 0), fs=8, rot=0, color=C_DIM):
@@ -110,7 +123,7 @@ def plot_cross_section(d: PMDesign, path: str):
     axA.set_aspect("equal"); axA.axis("off")
     axA.set_title(f"Cross-section — {fmt_q(d.S_rated / 1e3)}, {fmt_v(d.V_line)}, "
                   f"{d.f:.0f} Hz, {d.poles}-pole {d.rpm:.0f} rpm, {d.Qs} stator slots / "
-                  f"IPM rotor, {d.poles} buried NdFeB magnets", fontsize=11)
+                  f"IPM rotor, {d.poles} buried {'flat' if d.magnet_shape == 'rect' else 'arc'} NdFeB magnets", fontsize=11)
 
     # ---------------- B: radial detail -----------------------------------
     k = d.Qs // 4                               # stator slot near the top
@@ -165,14 +178,20 @@ def plot_cross_section(d: PMDesign, path: str):
         ("Winding", f"2-layer, pitch {d.coil_pitch}/{d.Qs // d.poles}, {d.parallel_paths} path(s)"),
         ("Series turns / phase", f"{d.series_turns:.0f}"),
         ("ROTOR", ""),
-        ("Magnet seat Ø / magnet OD", f"{mm(2 * g['R_core'])} / {mm(2 * g['R_mag'])} mm"),
-        ("Pole shoe / bridge", f"{d.t_shoe * 1e3:.1f} / {d.t_bridge * 1e3:.1f} mm"),
-        ("Flux barrier (each end)", f"{g['bar_deg']:.1f}°"),
+        *((("Magnet shape", "flat bar, parallel magnetised"),
+           ("Magnet width × thickness", f"{_rect_w(d) * 1e3:.1f} × {d.h_m * 1e3:.1f} mm"),
+           ("Depth below surface (axis)", f"{d.d_m * 1e3:.1f} mm"),
+           ("Bridge / barrier opening", f"{d.t_bridge * 1e3:.1f} mm / {d.barrier_deg:.1f}°"))
+          if d.magnet_shape == "rect" else
+          (("Magnet seat Ø / magnet OD", f"{mm(2 * g['R_core'])} / {mm(2 * g['R_mag'])} mm"),
+           ("Pole shoe / bridge", f"{d.t_shoe * 1e3:.1f} / {d.t_bridge * 1e3:.1f} mm"),
+           ("Flux barrier (each end)", f"{g['bar_deg']:.1f}°"))),
         ("Magnet thickness", f"{d.h_m * 1e3:.1f} mm"),
-        ("Magnet arc / pole pitch", f"{g['mag_deg']:.1f}° / {g['pole_deg']:.0f}° ({d.alpha_p_actual:.3f})"),
-        ("Magnet arc length (at OD)", f"{mm(math.radians(g['mag_deg']) * d.R_mag)} mm"),
+        *((("Magnet arc / pole pitch", f"{g['mag_deg']:.1f}° / {g['pole_deg']:.0f}° ({d.alpha_p_actual:.3f})"),
+           ("Magnet arc length (at OD)", f"{mm(math.radians(g['mag_deg']) * d.R_mag)} mm"))
+          if d.magnet_shape != "rect" else ()),
         ("Magnet grade", f"NdFeB Br {d.Br20:.2f} T @20°C, μr {d.mu_rm}"),
-        ("Magnetisation", "radial, alternating N/S"),
+        ("Magnetisation", ("parallel" if d.magnet_shape == "rect" else "radial") + ", alternating N/S"),
     ]
     y = 0.97
     for name, val in rows:

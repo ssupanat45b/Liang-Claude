@@ -19,16 +19,23 @@ class TestMeshMagnets(unittest.TestCase):
         mag = m.r_reg == MAGNET
         counts = np.bincount(m.r_tag[mag], minlength=d.poles)
         self.assertEqual(len(counts), d.poles)
-        self.assertTrue(np.all(counts == counts[0]), "all magnets must have the same mesh")
+        self.assertTrue(np.all(counts > 0))
         np.testing.assert_array_equal(magnet_sign(d, np.arange(4)), [1, -1, 1, -1])
         tri, xy, reg, part, nn, outer = m.connectivity(5)
         x, y = xy[..., 0], xy[..., 1]
         area = 0.5 * ((x[:, 1] - x[:, 0]) * (y[:, 2] - y[:, 0]) - (x[:, 2] - x[:, 0]) * (y[:, 1] - y[:, 0]))
         self.assertTrue(np.all(area > 0))
-        # magnet area = arc fraction * annulus area (polygonal mesh, small chord error)
-        ring = math.pi * (d.R_mag**2 - d.R_core**2) * d.alpha_p_actual
         nr = len(m.r_tri)
-        self.assertAlmostEqual(area[:nr][mag].sum() / ring, 1.0, delta=0.002)
+        if d.magnet_shape == "rect":                    # flat bar: exact rectangle area w*h per pole
+            from ipm_fem2d.rotor_rect import layout
+            ref = d.poles * layout(d)["w"] * d.h_m
+            tol = 1e-9
+        else:                                           # arc: fraction of the annulus (chord error)
+            ref = math.pi * (d.R_mag**2 - d.R_core**2) * d.alpha_p_actual
+            tol = 0.002
+        self.assertAlmostEqual(area[:nr][mag].sum() / ref, 1.0, delta=max(tol, 1e-6))
+        per_pole = np.bincount(m.r_tag[mag], weights=area[:nr][mag], minlength=d.poles)
+        np.testing.assert_allclose(per_pole, per_pole[0], rtol=1e-6)     # identical magnets
 
 
 class TestPMPhysics(unittest.TestCase):
@@ -58,11 +65,29 @@ class TestPMPhysics(unittest.TestCase):
         np.testing.assert_allclose(c.psi_abc, a.psi_abc + b.psi_abc, rtol=1e-8, atol=1e-10)
 
     def test_rotor_topology(self):
-        """Magnets buried: iron above every magnet (pole shoe) and flux barriers at both ends."""
+        """Magnets buried: iron above every magnet (pole shoe), flux barriers and bridges."""
         d, m = self.d, self.an.mesh
         c = m.r_xy[m.r_tri].mean(axis=1)
         r = np.hypot(c[:, 0], c[:, 1])
         th = np.degrees(np.arctan2(c[:, 1], c[:, 0]))
+        x, y = c[:, 0], c[:, 1]
+        disk = np.arange(len(m.r_tri)) < len(m.r_tri)
+        if d.magnet_shape == "rect":
+            from matplotlib.path import Path
+            from ipm_fem2d.rotor_rect import interior_point, layout, pole_polygons
+            g = layout(d)
+            on_axis = np.abs(y) < 0.004
+            shoe = on_axis & (x > g["x_out"] + 1e-3) & (r < d.R_rotor - 1e-4)
+            self.assertTrue(shoe.any() and np.all(m.r_reg[shoe] == ROTOR_IRON))
+            mag = on_axis & (x > g["x_in"] + 1e-3) & (x < g["x_out"] - 1e-3)
+            self.assertTrue(mag.any() and np.all(m.r_reg[mag] == MAGNET))
+            _, bu, _ = pole_polygons(d, 0)
+            inside = Path(np.array(bu)).contains_points(c) & (r < d.R_rotor)
+            self.assertTrue(inside.any() and np.mean(m.r_reg[inside] == AIR) > 0.95)
+            # magnetisation: parallel to the pole axis (pole 0: +x)
+            mm = (m.r_reg == MAGNET) & (m.r_tag == 0)
+            np.testing.assert_allclose(m.r_mdir[mm], np.tile([1.0, 0.0], (mm.sum(), 1)))
+            return
         on_axis = np.abs(th) < 2.0                                  # around the N-pole axis
         shoe = on_axis & (r > d.R_mag) & (r < d.R_rotor)
         self.assertTrue(np.all(m.r_reg[shoe] == ROTOR_IRON))
@@ -95,7 +120,12 @@ class TestPMPhysics(unittest.TestCase):
         B1, _ = fundamental_axis(th, Br, d.pp)
         g_tot = d.gap + d.h_m / d.mu_rm
         Bg = d.Br() * (d.h_m / d.mu_rm) / g_tot
-        B1_an = 4 / math.pi * Bg * math.sin(d.alpha_p_actual * math.pi / 2)
+        if d.magnet_shape == "rect":
+            from ipm_fem2d.rotor_rect import layout
+            alpha = layout(d)["w"] / (2 * math.pi * d.R_mag / d.poles)    # flat width / pole arc
+        else:
+            alpha = d.alpha_p_actual
+        B1_an = 4 / math.pi * Bg * math.sin(min(alpha, 1.0) * math.pi / 2)
         self.assertLess(B1, B1_an)
         self.assertGreater(B1, 0.5 * B1_an)
 
@@ -128,6 +158,19 @@ class TestPMPhysics(unittest.TestCase):
         Ipk = math.sqrt(2) * d.I_rated
         T = an.model.solve(i_abc=an.currents(Ipk, an.theta_d() + math.radians(135)), pm=0.0).torque
         self.assertGreater(abs(T), 0.05 * d.S_rated / (d.omega / d.pp))
+
+
+class TestArcIPM(TestPMPhysics):
+    """The same physics checks for the buried-ARC magnet variant (magnet_shape='arc')."""
+
+    @classmethod
+    def setUpClass(cls):
+        solver.set_backend("superlu")
+        cls.d = design_preset()
+        cls.d.magnet_shape = "arc"; cls.d.h_m = 0.0295; cls.d.alpha_p = 0.80
+        cls.d.skew_slots = 0.0
+        cls.an = PMAnalysis(cls.d, verbose=False)
+        cls.an.find_axes()
 
 
 if __name__ == "__main__":

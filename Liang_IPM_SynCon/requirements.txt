@@ -1,4 +1,5 @@
 numpy>=1.24
 scipy>=1.10
 matplotlib>=3.7
+triangle>=20230923   # unstructured rotor mesh for flat magnets
 # recommended fast CPU solver:  pip install pypardiso

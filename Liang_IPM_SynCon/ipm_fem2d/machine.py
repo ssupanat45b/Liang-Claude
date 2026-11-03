@@ -64,12 +64,19 @@ class PMDesign:
     parallel_paths: int = 2
     turns_per_coil: int = 2
     # ---- interior permanent magnets (IPM rotor) ------------------------
-    h_m: float = 0.0295           # magnet radial thickness [m] (sized for 300 kVAr at 400 V)
+    h_m: float = 0.041            # magnet thickness [m] (flat bar; sized for 300 kVAr at 400 V)
     alpha_p: float = 0.80         # magnet arc / pole pitch (rounded to the mesh divisions)
     t_shoe: float = 0.005         # iron pole shoe above the magnet [m]
     t_bridge: float = 0.0012      # iron bridge between flux barrier and rotor surface [m]
     barrier_frac: float = 0.06    # angular width of EACH flux barrier / pole pitch
     t_sleeve: float = 0.0         # no retaining sleeve on an IPM rotor
+    # ---- magnet shape ---------------------------------------------------
+    magnet_shape: str = "rect"    # "rect": flat bar, parallel magnetised | "arc": buried arc, radial
+    d_m: float = 0.036            # rect: rotor surface -> magnet outer face on the pole axis [m]
+    w_frac: float = 1.00          # rect: magnet width / widest width allowed (bridge corner and q-axis rib)
+    corner_margin: float = 0.003  # rect: outer magnet corner below the bridge circle [m]
+    barrier_gap_deg: float = 1.0  # rect: barrier start beyond the magnet corner angle [deg]
+    barrier_deg: float = 4.0      # rect: barrier opening along the bridge [deg]
     Br20: float = 1.23            # remanence at 20 degC [T]  (NdFeB N38SH class)
     mu_rm: float = 1.05           # magnet recoil permeability
     alpha_Br: float = -0.0012     # remanence temperature coefficient [1/K]
@@ -99,8 +106,8 @@ class PMDesign:
 
     @property
     def R_mag(self) -> float:
-        """Outer radius of the buried magnet (= underside of the pole shoe)."""
-        return self.R_rotor - self.t_shoe
+        """Magnet outer face on the pole axis (= underside of the pole shoe)."""
+        return self.R_rotor - (self.d_m if self.magnet_shape == "rect" else self.t_shoe)
 
     @property
     def R_core(self) -> float:
@@ -196,6 +203,10 @@ class PMDesign:
             raise ValueError("n_theta must be a multiple of 2*poles")
         if not 0 < self.h_m < 0.6 * self.R_rotor:
             raise ValueError("magnet thickness out of range")
+        if self.magnet_shape == "rect":
+            from .rotor_rect import check as _rect_check
+            _rect_check(self)
+            return
         if not 0 < self.t_bridge < self.t_shoe:
             raise ValueError("bridge must be thinner than the pole shoe")
         per_pole = self.n_theta // self.poles
@@ -230,6 +241,7 @@ class Mesh:
     r_reg: np.ndarray = field(default=None)
     r_tag: np.ndarray = field(default=None)       # magnet pole index or -1
     r_ring: np.ndarray = field(default=None)      # rotor node ids on the sliding circle
+    r_mdir: np.ndarray = field(default=None)      # (ne_r, 2) magnetisation unit vectors (rect) or None
     # stator part
     s_xy: np.ndarray = field(default=None)
     s_tri: np.ndarray = field(default=None)
@@ -319,6 +331,8 @@ def _build_part(radii, sizes, center: bool):
 
 def build_mesh(d: PMDesign) -> Mesh:
     d.check()
+    if d.magnet_shape == "rect":
+        return _build_mesh_rect(d)
     n = d.n_theta
     # ---------------- rotor radii -------------------------------------
     r_c = d.R_core
@@ -390,7 +404,7 @@ def build_mesh(d: PMDesign) -> Mesh:
     s_tag[top] = 2 * slot[top]
     s_tag[bot] = 2 * slot[bot] + 1
 
-    return Mesh(d, r_xy, r_tri, r_reg, r_tag, r_rings[-1], s_xy, s_tri, s_reg, s_tag,
+    return Mesh(d, r_xy, r_tri, r_reg, r_tag, r_rings[-1], None, s_xy, s_tri, s_reg, s_tag,
                 s_rings[0], s_rings[-1])
 
 
@@ -437,3 +451,67 @@ def fmt_q(kvar: float) -> str:
 
 def fmt_v(volts: float) -> str:
     return f"{volts / 1e3:g} kV" if volts >= 1000 else f"{volts:.0f} V"
+
+
+# ---------------------------------------------------------------------------
+def _stator_mesh(d: PMDesign, n: int):
+    """Structured stator part (shared by both rotor types)."""
+    gl = d.gap_layers // 2
+    rf = max(1, int(d.radial_refine))
+    s1 = d.R_bore + d.s_wedge
+    s2 = s1 + d.s_layer
+    s3 = s2 + d.s_layer
+    stator_r = list(np.linspace(d.R_slide, d.R_bore, gl + 1)) + [d.R_bore + 0.5 * d.s_wedge] \
+        + list(np.linspace(s1, s2, 3 * rf + 1)) + list(np.linspace(s2, s3, 3 * rf + 1)[1:]) \
+        + list(np.geomspace(s3, d.R_stator_out, 6 * rf + 1)[1:])
+    stator_r = sorted(set(np.round(stator_r, 9)))
+    s_xy, s_tri, s_rings = _build_part(stator_r, [n] * len(stator_r), center=False)
+    c = s_xy[s_tri].mean(axis=1)
+    rs, ts = np.hypot(c[:, 0], c[:, 1]), np.mod(np.arctan2(c[:, 1], c[:, 0]), 2 * np.pi)
+    dth = 2 * np.pi / n
+    s_reg = np.full(len(s_tri), STATOR_IRON)
+    s_tag = np.full(len(s_tri), -1)
+    jdiv = np.floor(ts / dth + 1e-9).astype(int)
+    slot = jdiv // d.div_per_slot
+    pos = jdiv % d.div_per_slot
+    lo = (d.div_per_slot - d.slot_divs) // 2
+    in_slot = (pos >= lo) & (pos < lo + d.slot_divs)
+    s_reg[rs < d.R_bore] = AIR
+    s_reg[in_slot & (rs > d.R_bore) & (rs < s1)] = STATOR_WEDGE
+    top = in_slot & (rs > s1) & (rs < s2)
+    bot = in_slot & (rs > s2) & (rs < s3)
+    s_reg[top | bot] = ARM_COIL
+    s_tag[top] = 2 * slot[top]
+    s_tag[bot] = 2 * slot[bot] + 1
+    return s_xy, s_tri, s_reg, s_tag, s_rings
+
+
+def _build_mesh_rect(d: PMDesign) -> Mesh:
+    """Unstructured (Triangle) rotor disk with flat magnets + structured gap rings + stator."""
+    from . import rotor_rect as rr
+    n = d.n_theta
+    xy, tri, kind, ring0 = rr.build(d, n)
+    xy_list, tris = [xy], [tri]
+    nid = len(xy)
+    prev = ring0
+    gl = d.gap_layers // 2
+    for r in np.linspace(d.R_rotor, d.R_slide, gl + 1)[1:]:
+        ids = _ring_nodes(r, n, nid, xy_list); nid += n
+        tris.append(np.array(_connect(prev, ids)))
+        prev = ids
+    r_xy = np.vstack(xy_list)
+    r_tri = np.vstack(tris)
+    ne_disk = len(tri)
+    r_reg = np.full(len(r_tri), AIR)
+    r_tag = np.full(len(r_tri), -1)
+    r_reg[:ne_disk][kind == rr.KIND_IRON] = ROTOR_IRON
+    r_reg[:ne_disk][kind == rr.KIND_BARRIER] = AIR
+    magm = kind >= rr.KIND_MAGNET
+    r_reg[:ne_disk][magm] = MAGNET
+    r_tag[:ne_disk][magm] = kind[magm] - rr.KIND_MAGNET
+    r_mdir = np.zeros((len(r_tri), 2))
+    mm = r_reg == MAGNET
+    r_mdir[mm] = rr.magnet_direction(d, r_tag[mm])
+    s_xy, s_tri, s_reg, s_tag, s_rings = _stator_mesh(d, n)
+    return Mesh(d, r_xy, r_tri, r_reg, r_tag, prev, r_mdir, s_xy, s_tri, s_reg, s_tag,
+                s_rings[0], s_rings[-1])

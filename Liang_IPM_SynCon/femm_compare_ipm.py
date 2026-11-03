@@ -51,6 +51,26 @@ class FemmDrawer:
             self.nodes.add(key)
         return x, y
 
+    def node_xy(self, x, y):
+        key = (round(x, 7), round(y, 7))
+        if key not in self.nodes:
+            self.f.mi_addnode(x, y)
+            self.nodes.add(key)
+        return x, y
+
+    def polyline(self, pts, closed=True):
+        m = len(pts)
+        for j in range(m if closed else m - 1):
+            (x1, y1), (x2, y2) = pts[j], pts[(j + 1) % m]
+            self.node_xy(x1, y1); self.node_xy(x2, y2)
+            self.f.mi_addsegment(x1, y1, x2, y2)
+
+    def label_xy(self, x, y, material, mesh, group=0, magdir=0):
+        self.f.mi_addblocklabel(x, y)
+        self.f.mi_selectlabel(x, y)
+        self.f.mi_setblockprop(material, 0, mesh, "<None>", magdir, group, 0)
+        self.f.mi_clearselected()
+
     def seg(self, r1, r2, deg):
         x1, y1 = self.node(r1, deg)
         x2, y2 = self.node(r2, deg)
@@ -119,9 +139,19 @@ def build_femm_model(femm, d: PMDesign, path: str, linear: bool = False):
             dr.arc(r, a0, a1, fine)
         for a in (a0, a1):
             dr.seg(g["R_bore"], g["s1"], a); dr.seg(g["s1"], g["s2"], a); dr.seg(g["s2"], g["s3"], a)
+    if d.magnet_shape == "rect":
+        from ipm_fem2d.rotor_rect import interior_point, pole_polygons
+        dr.circle(g["R_rotor"], [0, 180], fine)
+        for k in range(d.poles):
+            mag, bu, bl = pole_polygons(d, k)
+            dr.polyline(mag)
+            for bar in (bu, bl):
+                dr.polyline(bar[1:] + [bar[0]], closed=False)          # A-B is the magnet end
+        rt = []
     # IPM rotor: outer surface is a plain circle; per pole a closed pocket made of
     #   barrier | magnet | barrier  between R_core and R_bridge, magnet top at R_mag
-    dr.circle(g["R_rotor"], [0, 180], fine)
+    if d.magnet_shape != "rect":
+        dr.circle(g["R_rotor"], [0, 180], fine)
     for _, m0, m1 in rt:
         b0, b1 = m0 - g["bar_deg"], m1 + g["bar_deg"]
         for a0_, a1_ in ((b0, m0), (m0, m1), (m1, b1)):
@@ -156,6 +186,16 @@ def build_femm_model(femm, d: PMDesign, path: str, linear: bool = False):
                      sg * d.turns_per_coil / d.parallel_paths)
     r_mid = 0.5 * (g["R_core"] + g["R_mag"])
     m_mag = min(m_slot, d.h_m / 3, d.t_shoe / 2)
+    if d.magnet_shape == "rect":
+        m_mag = min(m_slot, d.h_m / 4)
+        for k in range(d.poles):
+            mag, bu, bl = pole_polygons(d, k)
+            cx, cy = np.mean(np.array(mag), axis=0)
+            dr.label_xy(cx, cy, "NdFeB", m_mag, ROTOR_GROUP,
+                        magdir=float((360.0 * k / d.poles + (0 if k % 2 == 0 else 180)) % 360))
+            for bar in (bu, bl):
+                bx, by = interior_point(bar)
+                dr.label_xy(float(bx), float(by), "Air", m_mag / 2, ROTOR_GROUP)
     for kp, a0, a1 in rt:
         dr.label(r_mid, 0.5 * (a0 + a1), "NdFeB", m_mag, group=ROTOR_GROUP,
                  magdir="theta" if kp % 2 == 0 else "theta+180")       # radial N / S

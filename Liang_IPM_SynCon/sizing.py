@@ -20,7 +20,10 @@ Sizing rules (all adjustable in SIZING below)
 * Air gap ~ 0.625 % of D (min 1.5 mm), no sleeve; pole shoe 1.25 % of D (min 3 mm),
   bridge 0.3 % of D (min 0.8 mm), flux barriers 6 % of the pole pitch at each magnet end.
 * End-winding length ~ 1.2 x coil span + 50 mm; end leakage scaled from ipm300.
-* Buried NdFeB N38SH arc magnets, 80 % pole arc, thickness from FEM (brentq on Q(h_m)).
+* Buried NdFeB N38SH FLAT-BAR magnets (one per pole, parallel magnetised), depth 11.5 % of
+  the pole pitch,
+  width = largest that fits under the bridges and leaves a q-axis rib; thickness from FEM
+  (scan + brentq on Q(h_m), which is non-monotonic for flat bars).
 """
 from __future__ import annotations
 
@@ -41,6 +44,10 @@ SIZING = dict(
     gap_frac=0.00625,    # mechanical gap / bore diameter
     gap_min=0.0015,
     shoe_frac=0.0125, shoe_min=0.003, bridge_frac=0.003, bridge_min=0.0008, barrier_frac=0.06,
+    magnet_shape="rect",  # flat bar (parallel magnetised); "arc" = buried arc (radial)
+    d_m_frac=0.115,       # rect: magnet depth below the surface / pole pitch (36 mm at 4p, 400 mm)
+    corner_frac=0.0075,
+    barrier_frac_rect=0.044, barrier_gap_frac=0.011,   # barrier opening / offset as fraction of pole pitch
     q=3, pitch_num=7,    # slots per pole per phase, coil pitch in slots (of 3q = 9)
     alpha_p=0.80,
     n_theta_target=432,  # angular mesh divisions (kept the same for every pole count)
@@ -106,7 +113,10 @@ def make_design(poles: int, D_bore: float, S=None):
         t_bridge=max(z["bridge_min"], z["bridge_frac"] * D_bore), barrier_frac=z["barrier_frac"],
         Qs=Qs, div_per_slot=div, slot_divs=div // 2, s_wedge=s_wedge, s_layer=s_layer,
         coil_pitch=z["pitch_num"], parallel_paths=a, turns_per_coil=tpc,
-        h_m=0.012, alpha_p=z["alpha_p"],
+        h_m=0.012, alpha_p=z["alpha_p"], magnet_shape=z["magnet_shape"],
+        d_m=z["d_m_frac"] * math.pi * D_bore / p, corner_margin=max(0.002, z["corner_frac"] * D_bore),
+        w_frac=1.0, barrier_deg=z["barrier_frac_rect"] * 360.0 / p,
+        barrier_gap_deg=z["barrier_gap_frac"] * 360.0 / p,
         X_end_pu=X_end, skew_slots=1.0, fill_arm=z["fill"], end_arm=end_arm,
         gap_layers=12, radial_refine=1)
     info = dict(poles=p, D_bore=D_bore, rpm=rpm, L=L, L_over_D=L / D_bore, Qs=Qs, a=a,
@@ -125,23 +135,40 @@ def evaluate(case):
     d, info = make_design(poles, D_bore)
     res = dict(info, status="ok", reason="")
     # ---- magnet sizing: Q(h_m) = rated at rated voltage ---------------------------
-    h_hi = min(0.060, 0.45 * d.R_mag)
+    # thickest magnet that still leaves a rotor yoke (x_in >= 0.36 R)
+    h_hi = min(0.080, d.R_mag - 0.36 * d.R_rotor)
 
     def q_of(h):
         dd = copy.deepcopy(d); dd.h_m = h
+        dd.check()                                      # raises for impossible geometry
         an = PMAnalysis(dd, verbose=False); an.find_axes()
         I, _ = an.current_for_voltage(dd.V_phase)
         return 3 * dd.V_phase * I / 1e3 - d.S_rated / 1e3
     from scipy.optimize import brentq
     try:
-        f_lo, f_hi = q_of(0.002), q_of(h_hi)
-        if f_hi < 0:
-            res.update(status="infeasible", reason=f"Q < rated even with {h_hi * 1e3:.0f} mm magnets")
-            d.h_m = h_hi
-        elif f_lo > 0:
-            d.h_m = 0.002
+        # Q(h) is NOT monotonic for flat magnets (a thicker bar must get narrower to keep the
+        # q-axis rib), so scan upward and refine the first crossing of the rated kVAr.
+        hs = np.linspace(0.004, h_hi, 7)
+        prev_h, prev_f, best = None, None, (-1e9, None)
+        found = None
+        for h in hs:
+            try:
+                f = q_of(h)
+            except ValueError:
+                break                                   # geometry no longer fits
+            best = max(best, (f, h))
+            if f >= 0:
+                found = (prev_h, prev_f, h, f)
+                break
+            prev_h, prev_f = h, f
+        if found is None:
+            res.update(status="infeasible",
+                       reason=f"Q < rated for every magnet thickness (best {best[0] + d.S_rated / 1e3:.0f} kVAr)")
+            d.h_m = best[1] if best[1] is not None else hs[0]
+        elif found[0] is None:
+            d.h_m = found[2]
         else:
-            d.h_m = brentq(q_of, 0.002, h_hi, xtol=1e-4)
+            d.h_m = brentq(q_of, found[0], found[2], xtol=1e-4)
     except Exception as e:                                # noqa: BLE001
         res.update(status="error", reason=f"sizing: {type(e).__name__}: {e}")
         res["runtime_s"] = time.time() - t0
