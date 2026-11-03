@@ -44,6 +44,8 @@ METRICS = [  # key, title, format, colormap, "lower is better"
     ("thd_line_pct", "EMF THD line-line [%]", "{:.2f}", "magma_r", True),
 ]
 
+SCALE = {"D_out": 1e3}          # stored in m, shown in mm
+
 LIMITS = dict(L_over_D=(0.3, 3.0), B_tooth_rated=(None, 2.0), I_cold_pu=(None, 1.6))
 
 
@@ -137,7 +139,7 @@ class LivePlot:
             v = rr.get("cost_usd", np.nan)
             okk, dmk, _ = feasible(rr, demag_limit)
             axh.text(j, i, ("—" if np.isnan(v) else f"{v:,.0f}") + ("" if okk else "\n✗") + ("" if dmk else " D"),
-                     ha="center", va="center", fontsize=8, color="k" if np.isnan(v) or v < np.nanmax(M) * 0.7 else "w")
+                     ha="center", va="center", fontsize=8, color=_txt_color(im, v))
         axh.add_patch(plt.Rectangle((_nearest(self.Ds, r["D_bore"]) - 0.5, self.poles.index(r["poles"]) - 0.5),
                                     1, 1, fill=False, ec="#00bcd4", lw=3))
         axh.set_xticks(range(len(self.Ds)), [f"{x * 1e3:.0f}" for x in self.Ds])
@@ -172,6 +174,18 @@ class LivePlot:
         return path
 
 
+def _txt_color(im, v):
+    """Black or white text depending on the cell colour luminance."""
+    if v is None or (isinstance(v, float) and np.isnan(v)):
+        return "k"
+    r_, g_, b_, _ = im.cmap(im.norm(v))
+    return "k" if 0.299 * r_ + 0.587 * g_ + 0.114 * b_ > 0.5 else "w"
+
+
+def _star(ax, j, i):
+    ax.plot(j - 0.36, i + 0.30, marker="*", ms=13, mec="k", mfc="#00e5ff", zorder=5)
+
+
 def _nearest(arr, v):
     return int(np.argmin(np.abs(np.asarray(arr) - v)))
 
@@ -189,7 +203,7 @@ def plot_heatmaps(rows, poles, Ds, outdir, demag_limit):
         for (p, j), r in idx.items():
             if p in poles:
                 v = r.get(key, np.nan)
-                M[poles.index(p), j] = v if isinstance(v, (int, float)) else np.nan
+                M[poles.index(p), j] = v * SCALE.get(key, 1.0) if isinstance(v, (int, float)) else np.nan
         im = ax.imshow(M, cmap=cmap, aspect="auto", origin="lower")
         vmax, vmin = np.nanmax(M) if np.isfinite(M).any() else 1, np.nanmin(M) if np.isfinite(M).any() else 0
         for (p, j), r in idx.items():
@@ -197,16 +211,14 @@ def plot_heatmaps(rows, poles, Ds, outdir, demag_limit):
             v = M[i, j]
             ok, dm_ok, _ = feasible(r, demag_limit)
             txt = "—" if np.isnan(v) else fmt.format(v)
-            frac = 0.5 if vmax == vmin or np.isnan(v) else (v - vmin) / (vmax - vmin)
-            dark = (frac > 0.6) if not cmap.endswith("_r") else (frac > 0.6)
-            ax.text(j, i, txt, ha="center", va="center", fontsize=7.5, color="w" if dark and cmap != "RdYlGn" else "k")
+            ax.text(j, i, txt, ha="center", va="center", fontsize=7.5, color=_txt_color(im, v))
             if not ok:
                 ax.add_patch(plt.Rectangle((j - 0.5, i - 0.5), 1, 1, fill=False, hatch="///", ec="#555555", lw=0))
             if not dm_ok:
-                ax.text(j + 0.42, i + 0.32, "D", fontsize=6, color="#c0392b", ha="right", fontweight="bold")
+                ax.text(j + 0.42, i + 0.30, "D", fontsize=7, color="#ff5252", ha="right", va="center",
+                        fontweight="bold")
         if best is not None:
-            ax.plot(_nearest(Ds, best["D_bore"]), poles.index(best["poles"]), marker="*", ms=16,
-                    mec="k", mfc="#00e5ff")
+            _star(ax, _nearest(Ds, best["D_bore"]), poles.index(best["poles"]))
         ax.set_xticks(range(len(Ds)), [f"{x * 1e3:.0f}" for x in Ds], fontsize=8)
         ax.set_yticks(range(len(poles)), [f"{p}p" for p in poles], fontsize=8)
         ax.set_title(title, fontsize=10)
@@ -231,11 +243,11 @@ def plot_heatmaps(rows, poles, Ds, outdir, demag_limit):
         for (p, j), r in idx.items():
             i = poles.index(p); ok, dm_ok, _ = feasible(r, demag_limit)
             ax.text(j, i, ("—" if np.isnan(M[i, j]) else fmt.format(M[i, j])) + ("" if dm_ok else "\nD"),
-                    ha="center", va="center", fontsize=9)
+                    ha="center", va="center", fontsize=9, color=_txt_color(im, M[i, j]))
             if not ok:
                 ax.add_patch(plt.Rectangle((j - 0.5, i - 0.5), 1, 1, fill=False, hatch="///", ec="#555555", lw=0))
         if best is not None:
-            ax.plot(_nearest(Ds, best["D_bore"]), poles.index(best["poles"]), "*", ms=20, mec="k", mfc="#00e5ff")
+            _star(ax, _nearest(Ds, best["D_bore"]), poles.index(best["poles"]))
         ax.set_xticks(range(len(Ds)), [f"{x * 1e3:.0f}" for x in Ds]); ax.set_yticks(range(len(poles)), [f"{p}-pole" for p in poles])
         ax.set_xlabel("stator bore Ø [mm]"); ax.set_title(title); fig.colorbar(im, ax=ax, shrink=0.85)
     fig.suptitle("Decision heatmaps (/// not feasible, D demag risk, ★ lowest-cost feasible)", fontsize=13, fontweight="bold")
@@ -263,7 +275,7 @@ def write_report(rows, poles, Ds, outdir, demag_limit, files, runtime):
     feas = [r for r in rows if feasible(r, demag_limit)[0]]
     lines = [f"# Sizing study — 300 kVAr / 400 V SPM synchronous condenser\n",
              f"{len(rows)} cases: poles {poles}, stator bore {', '.join(f'{d * 1e3:.0f}' for d in Ds)} mm. "
-             f"Runtime {runtime / 60:.1f} min. Demagnetisation limit {demag_limit:.2f} T.\n",
+             (f"Runtime {runtime / 60:.1f} min. " if runtime else "") + f"Demagnetisation limit {demag_limit:.2f} T.\n",
              "Feasibility: " + ", ".join(f"{k} in {v}" for k, v in LIMITS.items()) + "; magnets sized for rated kVAr.\n"]
     if best:
         lines.append(f"**Lowest material cost feasible design:** {best['poles']}-pole, Ø bore {best['D_bore'] * 1e3:.0f} mm, "
