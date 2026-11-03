@@ -62,15 +62,58 @@ def subtract(blank, tools):
                      ["NAME:SubtractParameters", "KeepOriginals:=", False])
 
 
-def bh_material(name, HB):
+def _bh_args(name, HB, style):
     pts = [["NAME:Point", float(h), float(b)] for h, b in HB]
-    oDefinitionManager.AddMaterial(["NAME:" + name, "CoordinateSystemType:=", "Cartesian", "BulkOrSurfaceType:=", 1,
-                                    ["NAME:PhysicsTypes", "set:=", ["Electromagnetic"]],
-                                    ["NAME:permeability", "property_type:=", "nonlinear",
-                                     "BTypeForSingleCurve:=", "normal", "HUnit:=", "A_per_meter", "BUnit:=", "tesla",
-                                     "IsTemperatureDependent:=", False,
-                                     ["NAME:BHCoordinates", ["NAME:DimUnits", "", ""]] + pts],
-                                    "conductivity:=", "0"])
+    flat = ["NAME:Points"]
+    for h, b in HB:
+        flat += [float(h), float(b)]
+    head = ["NAME:" + name, "CoordinateSystemType:=", "Cartesian", "BulkOrSurfaceType:=", 1,
+            ["NAME:PhysicsTypes", "set:=", ["Electromagnetic"]]]
+    if style == 1:      # AEDT 2019-2021 recorded format
+        perm = ["NAME:permeability", "property_type:=", "nonlinear", "BTypeForSingleCurve:=", "normal",
+                "HUnit:=", "A_per_meter", "BUnit:=", "tesla", "IsTemperatureDependent:=", False,
+                ["NAME:BHCoordinates", ["NAME:DimUnits", "", ""]] + pts, ["NAME:Temperatures"]]
+    elif style == 2:    # minimal old format
+        perm = ["NAME:permeability", "property_type:=", "nonlinear",
+                ["NAME:BHCoordinates", ["NAME:DimUnits", "", ""]] + pts]
+    elif style == 3:    # newer flat point list
+        perm = ["NAME:permeability", "property_type:=", "nonlinear", "BTypeForSingleCurve:=", "normal",
+                "HUnit:=", "A_per_meter", "BUnit:=", "tesla", "IsTemperatureDependent:=", False,
+                ["NAME:BHCoordinates", ["NAME:DimUnits", "", ""], flat]]
+    else:               # PyAEDT 2022+ format
+        perm = ["NAME:permeability", "property_type:=", "nonlinear", "BTypeForSingleCurve:=", "normal",
+                "HUnit:=", "A_per_meter", "BUnit:=", "tesla", "IsTemperatureDependent:=", False,
+                ["NAME:BHCoordinates", ["NAME:DimUnits", "", ""]] + pts]
+    return head + [perm, "conductivity:=", "0"]
+
+
+def _delete(name):
+    try:
+        oEditor.Delete(["NAME:Selections", "Selections:=", name])
+    except Exception:
+        pass
+
+
+def bh_material(name, HB, fallback="steel_1008"):
+    """Define a nonlinear material; check that AEDT accepts the curve by assigning it to a test circle."""
+    for style in (1, 2, 3, 4):
+        mname = name if style == 1 else "%%s_f%%d" %% (name, style)
+        try:
+            oDefinitionManager.AddMaterial(_bh_args(mname, HB, style))
+        except Exception as e:
+            msg("B-H format %%d for %%s not accepted (%%s)" %% (style, name, e), 1)
+            continue
+        try:
+            circle("BH_test", 1.0, mname)
+            _delete("BH_test")
+            msg("material %%s: B-H curve OK (format %%d)" %% (mname, style))
+            return mname
+        except Exception as e:
+            _delete("BH_test")
+            msg("B-H format %%d for %%s rejected on assignment - trying next format" %% (style, name), 1)
+    msg("WARNING: no B-H format accepted for %%s -> library material %%s is used instead "
+        "(results will differ from the Python FEM)" %% (name, fallback), 2)
+    return fallback
 
 
 # ---------------------------------------------------------------- project / design
@@ -92,8 +135,8 @@ msg("design + variables")
 
 # ---------------------------------------------------------------- materials
 oDefinitionManager = oProject.GetDefinitionManager()
-bh_material("M330_50A_pyFEM", D["bh_stator"])
-bh_material("RotorSteel_pyFEM", D["bh_rotor"])
+MAT_STATOR = bh_material("M330_50A_pyFEM", D["bh_stator"])
+MAT_ROTOR = bh_material("RotorSteel_pyFEM", D["bh_rotor"])
 oDefinitionManager.AddMaterial(["NAME:NdFeB_N38SH_80C", "CoordinateSystemType:=", "Cartesian",
                                 "BulkOrSurfaceType:=", 1, ["NAME:PhysicsTypes", "set:=", ["Electromagnetic"]],
                                 "permeability:=", str(D["mu_rm"]), "conductivity:=", "0",
@@ -103,7 +146,7 @@ oDefinitionManager.AddMaterial(["NAME:NdFeB_N38SH_80C", "CoordinateSystemType:="
 msg("materials")
 
 # ---------------------------------------------------------------- stator + coils
-circle("Stator", D["R_out"], "M330_50A_pyFEM", "(160 170 190)")
+circle("Stator", D["R_out"], MAT_STATOR, "(160 170 190)")
 circle("Bore_tmp", D["R_bore"])
 slots = [polygon("Slot_%%02d" %% (k + 1), s) for k, s in enumerate(D["slots"])]
 subtract("Stator", ["Bore_tmp"] + slots)
@@ -113,7 +156,7 @@ for c in D["coils"]:
 msg("stator and %%d coil sides" %% len(D["coils"]))
 
 # ---------------------------------------------------------------- rotor + magnets
-circle("Rotor", D["R_rotor"], "RotorSteel_pyFEM", "(130 140 160)")
+circle("Rotor", D["R_rotor"], MAT_ROTOR, "(130 140 160)")
 tools = [polygon(b["name"], b["poly"]) for b in D["barriers"]]
 tools += [polygon("Pocket_" + m["name"], m["poly"]) for m in D["magnets"]]
 subtract("Rotor", tools)
