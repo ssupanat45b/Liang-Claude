@@ -1,6 +1,6 @@
 # Sizing study — 300 kVAr / 400 V SPM synchronous condenser
 
-28 cases: poles [2, 4, 6, 8], stator bore 250, 300, 350, 400, 450, 500, 550 mm. Runtime 0.0 min. Demagnetisation limit 0.10 T.
+28 cases: poles [2, 4, 6, 8], stator bore 250, 300, 350, 400, 450, 500, 550 mm. Demagnetisation limit 0.10 T.
 
 Feasibility: L_over_D in (0.3, 3.0), B_tooth_rated in (None, 2.0), I_cold_pu in (None, 1.6); magnets sized for rated kVAr.
 

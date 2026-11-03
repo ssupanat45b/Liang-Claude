@@ -275,7 +275,7 @@ def write_report(rows, poles, Ds, outdir, demag_limit, files, runtime):
     feas = [r for r in rows if feasible(r, demag_limit)[0]]
     lines = [f"# Sizing study — 300 kVAr / 400 V SPM synchronous condenser\n",
              f"{len(rows)} cases: poles {poles}, stator bore {', '.join(f'{d * 1e3:.0f}' for d in Ds)} mm. "
-             (f"Runtime {runtime / 60:.1f} min. " if runtime else "") + f"Demagnetisation limit {demag_limit:.2f} T.\n",
+             + (f"Runtime {runtime / 60:.1f} min. " if runtime else "") + f"Demagnetisation limit {demag_limit:.2f} T.\n",
              "Feasibility: " + ", ".join(f"{k} in {v}" for k, v in LIMITS.items()) + "; magnets sized for rated kVAr.\n"]
     if best:
         lines.append(f"**Lowest material cost feasible design:** {best['poles']}-pole, Ø bore {best['D_bore'] * 1e3:.0f} mm, "
