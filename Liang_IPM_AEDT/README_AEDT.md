@@ -70,3 +70,16 @@ native script สร้างทุกอย่างเหมือน PyAEDT (
   ถ้า PyAEDT เวอร์ชันของคุณ error ในขั้นตอนใด ให้ส่ง traceback มา
 * ขั้น report/torque อยู่ใน try — ถ้าข้าม ให้สร้าง report เองใน Results ▸ Create Transient Report
 * ถ้าค่า Theta_d0 / แกนเฟสไม่ตรง (เช่น Q ติดลบ) ให้รัน `--load noload` ดูเฟสของ EMF ก่อน
+
+## หลังสร้างโมเดลได้แล้ว: solve และเทียบผล
+1. ตั้งจำนวน core: Tools ▸ Options ▸ General Options ▸ Analysis Options (หรือ HPC and Analysis Options)
+   ▸ Edit ▸ Cores = 8 (หรือมากกว่า) แล้วกด **Analyze All**
+2. หลัง solve: Results ▸ Update All Reports
+   (field plot: เลือก Stator+Rotor ▸ คลิกขวา Fields ▸ B ▸ Mag_B, เลือกเวลาจาก Time = ... ด้านล่างจอ)
+3. คลิกขวาที่แต่ละ report (Torque, Flux linkage, Induced voltage, Winding current) ▸ **Export...**
+   ▸ เลือกชนิด .csv ▸ บันทึกลงโฟลเดอร์ `aedt_model\`
+4. `python compare_aedt.py` → ตารางเทียบ AEDT กับ Python FEM + รูป `aedt_model\aedt_compare_rated.png`
+5. โมเดล no-load (EMF, THD, cogging; time step ละเอียด T/720):
+   `python build_aedt.py --script-only --load noload` → Run Script → Analyze → export CSV ลงโฟลเดอร์ใหม่
+   เช่น `aedt_noload\` (คัดลอก aedt_expected.json ของ noload ไปด้วย) แล้ว
+   `python compare_aedt.py --load noload --dir aedt_noload`

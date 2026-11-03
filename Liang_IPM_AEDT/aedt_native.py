@@ -288,7 +288,7 @@ def export(d, G, ref, out_dir, load):
         rpm=f"{d.rpm:.1f}rpm", currents=currents, parallel=int(d.parallel_paths), turns=int(d.turns_per_coil),
         mesh=[("Mesh_magnets", mags, 2.0), ("Mesh_rotor", ["Rotor"], 4.0), ("Mesh_coils", coils, 3.0),
               ("Mesh_stator", ["Stator"], 5.0), ("Mesh_band", ["Band"], 1.5)],
-        stop=f"{2 * period * 1e3:.3f}ms", step=f"{period / 200 * 1e3:.4f}ms",
+        stop=f"{2 * period * 1e3:.3f}ms", step=f"{period / (720 if load == 'noload' else 200) * 1e3:.5f}ms",
         reports=[("Torque", ["Moving1.Torque"]),
                  ("Flux linkage", [f"FluxLinkage(Phase{p})" for p in "ABC"]),
                  ("Induced voltage", [f"InducedVoltage(Phase{p})" for p in "ABC"]),
