@@ -1,0 +1,6 @@
+numpy
+scipy
+matplotlib
+triangle
+scikit-learn
+pyaedt>=0.10
