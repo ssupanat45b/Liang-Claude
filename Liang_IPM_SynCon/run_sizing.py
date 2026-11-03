@@ -39,6 +39,7 @@ METRICS = [  # key, title, format, colormap, "lower is better"
     ("I_cold_pu", "Current with cold magnets [pu]", "{:.2f}", "magma_r", True),
     ("E0_cold_pu", "Open-circuit EMF, cold [pu]", "{:.2f}", "magma_r", True),
     ("saliency", "Saliency Xq / Xd", "{:.2f}", "viridis", None),
+    ("L_factor", "Core lengthening needed for 300 kVAr [x]", "{:.2f}", "magma_r", True),
     ("B_tooth_rated", "Stator tooth B, rated [T]", "{:.2f}", "magma_r", True),
     ("H_s", "Inertia constant H [s]", "{:.2f}", "viridis", False),
     ("thd_line_pct", "EMF THD line-line [%]", "{:.2f}", "magma_r", True),
@@ -108,7 +109,8 @@ class LivePlot:
         # 2) key parameters of this case
         axt = fig.add_axes([0.27, 0.40, 0.22, 0.52]); axt.axis("off")
         g = lambda k, f="{:.2f}": (f.format(r[k]) if k in r and not (isinstance(r[k], float) and math.isnan(r[k])) else "—")
-        rows = [("speed", f"{r['rpm']:.0f} rpm"), ("core length L", f"{r['L'] * 1e3:.0f} mm  (L/D {r['L_over_D']:.2f})"),
+        rows = [("speed", f"{r['rpm']:.0f} rpm"), ("core length L", f"{r['L'] * 1e3:.0f} mm  (L/D {r['L_over_D']:.2f}, "
+                                                    f"x{r.get('L_factor', 1.0):.2f})"),
                 ("turns/coil × paths", f"{r['turns_per_coil']} × {r['a']}  (N = {r['N_series']:.0f})"),
                 ("magnet thickness", g("h_m_mm", "{:.1f}") + " mm"), ("magnet mass", g("m_magnet_kg", "{:.1f}") + " kg"),
                 ("Q at 400 V", g("Q_kVAr", "{:.0f}") + " kVAr"), ("Xd", g("Xd_pu", "{:.3f}") + " pu"),
@@ -194,7 +196,7 @@ def _nearest(arr, v):
 def plot_heatmaps(rows, poles, Ds, outdir, demag_limit):
     import matplotlib.pyplot as plt
     idx = {(r["poles"], _nearest(Ds, r["D_bore"])): r for r in rows}
-    ncol = 4
+    ncol = 4 if len(METRICS) <= 16 else 5
     nrow = math.ceil(len(METRICS) / ncol)
     fig, axs = plt.subplots(nrow, ncol, figsize=(5.2 * ncol, 3.6 * nrow))
     best = best_design(rows, demag_limit)
@@ -346,7 +348,8 @@ def main():
             r, design = fu.result()
             rows.append(r); live.results.append(r)
             ok, dm_ok, why = feasible(r, a.demag_limit)
-            print(f"[{k:2d}/{len(cases)}] {r['poles']}-pole Ø{r['D_bore'] * 1e3:4.0f}: L {r['L'] * 1e3:5.0f} mm, "
+            print(f"[{k:2d}/{len(cases)}] {r['poles']}-pole Ø{r['D_bore'] * 1e3:4.0f}: L {r['L'] * 1e3:5.0f} mm "
+              f"(x{r.get('L_factor', 1.0):.2f}), "
                   f"h_m {r.get('h_m_mm', float('nan')):5.1f} mm, magnets {r.get('m_magnet_kg', float('nan')):5.1f} kg, "
                   f"loss {r.get('loss_pct', float('nan')):4.2f} %, B_sc {r.get('Bd_min_sc', float('nan')):5.2f} T, "
                   f"cost {r.get('cost_usd', float('nan')):7,.0f}  {'OK' if ok else 'x'}{'' if dm_ok else ' D'}  "

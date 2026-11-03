@@ -138,37 +138,61 @@ def evaluate(case):
     # thickest magnet that still leaves a rotor yoke (x_in >= 0.36 R)
     h_hi = min(0.080, d.R_mag - 0.36 * d.R_rotor)
 
-    def q_of(h):
-        dd = copy.deepcopy(d); dd.h_m = h
+    L0 = d.L_stack
+    end_arm = d.end_arm
+
+    def apply_L(dd, k):
+        dd.L_stack = L0 * k
+        dd.X_end_pu = float(np.clip(0.06 * (end_arm / dd.L_stack) / (0.30 / 0.45), 0.02, 0.30))
+
+    def q_of(h, k=1.0):
+        dd = copy.deepcopy(d); dd.h_m = h; apply_L(dd, k)
         dd.check()                                      # raises for impossible geometry
         an = PMAnalysis(dd, verbose=False); an.find_axes()
         I, _ = an.current_for_voltage(dd.V_phase)
         return 3 * dd.V_phase * I / 1e3 - d.S_rated / 1e3
-    from scipy.optimize import brentq
+    from scipy.optimize import brentq, minimize_scalar
     try:
         # Q(h) is NOT monotonic for flat magnets (a thicker bar must get narrower to keep the
-        # q-axis rib), so scan upward and refine the first crossing of the rated kVAr.
-        hs = np.linspace(0.004, h_hi, 7)
+        # q-axis rib): scan, refine the first crossing; if Q never reaches the rating, take the
+        # thickness of maximum Q and lengthen the core just enough (designer's choice).
+        hs = np.linspace(0.004, h_hi, 9)
         prev_h, prev_f, best = None, None, (-1e9, None)
-        found = None
+        found, h_ok = None, []
         for h in hs:
             try:
                 f = q_of(h)
             except ValueError:
                 break                                   # geometry no longer fits
+            h_ok.append(h)
             best = max(best, (f, h))
             if f >= 0:
                 found = (prev_h, prev_f, h, f)
                 break
             prev_h, prev_f = h, f
-        if found is None:
-            res.update(status="infeasible",
-                       reason=f"Q < rated for every magnet thickness (best {best[0] + d.S_rated / 1e3:.0f} kVAr)")
-            d.h_m = best[1] if best[1] is not None else hs[0]
-        elif found[0] is None:
-            d.h_m = found[2]
+        k = 1.0
+        if found is not None:
+            d.h_m = found[2] if found[0] is None else brentq(q_of, found[0], found[2], xtol=1e-4)
+        elif best[1] is not None:
+            step = hs[1] - hs[0]
+            lo, hi = max(hs[0], best[1] - step), min(h_ok[-1], best[1] + step)
+            opt = minimize_scalar(lambda h: -q_of(h), bounds=(lo, hi), method="bounded",
+                                  options=dict(xatol=5e-4))
+            h_pk, f_pk = float(opt.x), -float(opt.fun)
+            if f_pk >= 0:
+                d.h_m = brentq(q_of, lo, h_pk, xtol=1e-4)
+            else:
+                d.h_m = h_pk
+                g2 = q_of(h_pk, 2.0)
+                if g2 < 0:
+                    res.update(status="infeasible",
+                               reason=f"Q < rated even with 2x core length (max {f_pk + d.S_rated / 1e3:.0f} kVAr at L0)")
+                else:
+                    k = brentq(lambda kk: q_of(h_pk, kk), 1.0, 2.0, xtol=2e-3)
         else:
-            d.h_m = brentq(q_of, found[0], found[2], xtol=1e-4)
+            res.update(status="infeasible", reason="no valid magnet geometry")
+        apply_L(d, k)
+        res.update(L=d.L_stack, L_over_D=d.L_stack / D_bore, L_factor=k, X_end_pu=d.X_end_pu)
     except Exception as e:                                # noqa: BLE001
         res.update(status="error", reason=f"sizing: {type(e).__name__}: {e}")
         res["runtime_s"] = time.time() - t0
