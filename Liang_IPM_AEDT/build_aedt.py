@@ -87,6 +87,9 @@ def sector(r_in, r_out, a0, a1, step_deg=0.5):
     return inner + outer
 
 
+COIL_CLEAR_MM = 0.1
+
+
 def geometry_mm(d):
     """All polygons of the machine in mm (pure Python - also used for the preview)."""
     from ipm_fem2d.dimensions import geometry
@@ -102,8 +105,12 @@ def geometry_mm(d):
         slots.append(sector(g["R_bore"] * mm, g["s3"] * mm, a0, a1))
         for layer, (r0, r1) in enumerate(((g["s1"], g["s2"]), (g["s2"], g["s3"]))):
             ph, sg = lay[layer][k]
+            # 0.1 mm clearance to the slot walls and between the layers (slot liner), so that the
+            # coils never touch/intersect the stator iron in AEDT (coincident edges + rounding)
+            c_r0, c_r1 = r0 * mm + COIL_CLEAR_MM, r1 * mm - COIL_CLEAR_MM
+            da = math.degrees(COIL_CLEAR_MM / c_r0)
             coils.append(dict(name=f"Coil_{'ABC'[ph]}_{k + 1:02d}_{'top' if layer == 0 else 'bot'}",
-                              phase="ABC"[ph], sign=sg, poly=sector(r0 * mm, r1 * mm, a0, a1)))
+                              phase="ABC"[ph], sign=sg, poly=sector(c_r0, c_r1, a0 + da, a1 - da)))
     magnets, barriers = [], []
     for k in range(d.poles):
         mag, bu, bl = pole_polygons(d, k)

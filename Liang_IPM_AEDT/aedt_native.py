@@ -250,7 +250,7 @@ msg("saved " + D["project"] + "  -> Validate (F7), then Analyze All")
 '''
 
 
-def _r(v, n=4):
+def _r(v, n=6):
     return round(float(v), n)
 
 
