@@ -88,7 +88,7 @@ def slot_angles(d: SCDesign):
     return st, rt
 
 
-def build_femm_model(femm, d: SCDesign, path: str):
+def build_femm_model(femm, d: SCDesign, path: str, linear: bool = False):
     g = geometry(d)
     femm.newdocument(0)
     femm.mi_probdef(0, "meters", "planar", 1e-8, d.L_stack, 30)
@@ -96,6 +96,9 @@ def build_femm_model(femm, d: SCDesign, path: str):
     femm.mi_addmaterial("Air", 1, 1, 0, 0, 0, 0, 0, 1, 0, 0, 0)
     femm.mi_addmaterial("Copper", 1, 1, 0, 0, 0, 0, 0, 1, 0, 0, 0)
     for name, mat in (("StatorLam", STATOR_LAMINATION), ("RotorForging", ROTOR_FORGING)):
+        if linear:      # diagnostic / --linear mode: constant mu_r = 1000
+            femm.mi_addmaterial(name, 1000, 1000, 0, 0, 0, 0, 0, 1, 0, 0, 0)
+            continue
         femm.mi_addmaterial(name, 1, 1, 0, 0, 0, 0, 0, 1, 0, 0, 0)
         for B, H in zip(mat.B_table, mat.H_table):
             femm.mi_addbhpoint(name, float(B), float(H))
@@ -143,16 +146,59 @@ def build_femm_model(femm, d: SCDesign, path: str):
         am = 0.5 * (a0 + a1)
         dr.label(0.5 * (g["r_wedge_bottom"] + g["R_rotor"]), am, "Air", m_slot, group=ROTOR_GROUP)
         dr.label(0.5 * (g["r_slot_bottom"] + g["r_wedge_bottom"]), am, "Copper", m_slot, "F",
-                 ROTOR_GROUP, fs[i] * d.Nf_per_slot)
+                 ROTOR_GROUP, float(fs[i] * d.Nf_per_slot))
     femm.mi_zoomnatural()
+    try:
+        femm.mi_smartmesh(0)          # use the explicit block mesh sizes only
+    except Exception:
+        pass
     femm.mi_saveas(path)
 
 
-def femm_solve(femm, d: SCDesign, i_abc, i_f):
+def mesh_check(femm):
+    """Run the mesher only; returns the number of mesh nodes (None if unavailable)."""
+    try:
+        n = femm.mi_createmesh()
+        femm.mi_purgemesh()
+        return n
+    except Exception as e:                          # noqa: BLE001
+        print("   mesher error:", e)
+        return None
+
+
+def diagnose(femm, d: SCDesign, out_dir: str, show: bool):
+    """Find out which step fails: meshing, the linear solve or the nonlinear iteration."""
+    print("\n=== FEMM diagnostics ===")
+    nl = os.path.abspath(os.path.join(out_dir, "sc_model.fem"))
+    femm.opendocument(nl)
+    n = mesh_check(femm)
+    print(f"1) mesh of nonlinear model: {n} nodes" if n else "1) MESH FAILED (geometry problem)")
+    lin = os.path.abspath(os.path.join(out_dir, "sc_model_linear.fem"))
+    build_femm_model(femm, d, lin, linear=True)
+    femm.mi_modifycircprop("F", 1, 100.0)
+    femm.mi_saveas(lin)
+    try:
+        femm.mi_analyze(0 if show else 1)
+        femm.mi_loadsolution()
+        psi = femm.mo_getcircuitproperties("F")[2]
+        femm.mo_close()
+        print(f"2) linear model (mu_r = 1000) SOLVED, field flux linkage = {psi:.4f} Wb")
+        print("   -> geometry and mesh are fine; the NONLINEAR iteration is what fails.")
+        print("      Run the comparison with linear iron instead:  python femm_compare.py --linear")
+    except Exception as e:                          # noqa: BLE001
+        print(f"2) linear model ALSO FAILED: {e}")
+        print("   -> meshing/solver problem. Open femm_model\\sc_model_linear.fem in the FEMM window,")
+        print("      press 'Mesh' (yellow grid) and then 'Run' (crank): FEMM shows the detailed message.")
+    print("========================")
+
+
+def femm_solve(femm, d: SCDesign, i_abc, i_f, path=None, show=False):
     for c, i in zip(PHASES, i_abc):
         femm.mi_modifycircprop(c, 1, float(i))
     femm.mi_modifycircprop("F", 1, float(i_f))
-    femm.mi_analyze(1)
+    if path:
+        femm.mi_saveas(path)             # make sure FEMM solves the current state
+    femm.mi_analyze(0 if show else 1)
     femm.mi_loadsolution()
     psi = [femm.mo_getcircuitproperties(c)[2] for c in PHASES]
     femm.mo_groupselectblock(ROTOR_GROUP)
@@ -175,6 +221,8 @@ def main():
     ap.add_argument("--out", default="femm_model")
     ap.add_argument("--build-only", action="store_true")
     ap.add_argument("--show", action="store_true")
+    ap.add_argument("--linear", action="store_true",
+                    help="use linear iron (mu_r = 1000) in both FEMM and Python")
     a = ap.parse_args()
     try:
         import femm
@@ -185,8 +233,10 @@ def main():
     fem_path = os.path.abspath(os.path.join(a.out, "sc_model.fem"))
     d = SCDesign()
     femm.openfemm(0 if a.show else 1)
-    build_femm_model(femm, d, fem_path)
+    build_femm_model(femm, d, fem_path, linear=a.linear)
     print("FEMM model written:", fem_path)
+    n = mesh_check(femm)
+    print(f"FEMM mesh check: {n} nodes" if n else "FEMM mesh check: no node count returned")
     if a.build_only:
         femm.closefemm()
         return
@@ -215,10 +265,16 @@ def main():
     rows = []
     for name, cur, If in cases:
         t0 = time.time()
-        sp = an.solve(i_abc=cur, i_f=If)
+        sp = an.solve(i_abc=cur, i_f=If, **({"linear_mu_r": 1000.0} if a.linear else {}))
         th, Br, _ = an.model.gap_flux_density(sp, radius=d.R_rotor + 0.5 * d.gap)
         py = dict(psi=dq(sp.psi_abc), T=sp.torque, B1=fundamental_axis(th, Br)[0])
-        psi_f, T_f, B1_f = femm_solve(femm, d, cur, If)
+        try:
+            psi_f, T_f, B1_f = femm_solve(femm, d, cur, If, fem_path, a.show)
+        except Exception as e:                      # noqa: BLE001
+            print(f"\nFEMM failed on case '{name}': {e}")
+            diagnose(femm, d, a.out, a.show)
+            femm.closefemm()
+            raise SystemExit(1)
         fm = dict(psi=dq(psi_f), T=T_f, B1=B1_f)
         rows.append((name, py, fm))
         print(f"  {name:40s} done ({time.time() - t0:.0f} s)")
