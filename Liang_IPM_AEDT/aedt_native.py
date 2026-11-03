@@ -141,7 +141,7 @@ oBoundary.AssignVectorPotential(["NAME:VectorPotential_A0", "Edges:=", edges, "V
 oModel = oDesign.GetModule("ModelSetup")
 oModel.AssignBand(["NAME:MotionSetup1", "Move Type:=", "Rotate", "Coordinate System:=", "Global", "Axis:=", "Z",
                    "Is Positive:=", True, "InitPos:=", "0deg", "HasRotateLimit:=", False, "NonCylindrical:=", False,
-                   "Consider Mechanical Transient:=", False, "Angular Velocity:=", "Speed_rpm*1rpm",
+                   "Consider Mechanical Transient:=", False, "Angular Velocity:=", D["rpm"],
                    "Objects:=", ["Band"]])
 msg("band / motion / boundary")
 
@@ -170,17 +170,27 @@ for mn, objs, L in D["mesh"]:
 
 # ---------------------------------------------------------------- transient setup
 oAnalysis = oDesign.GetModule("AnalysisSetup")
-oAnalysis.InsertSetup("Transient", ["NAME:Transient", "Enabled:=", True, ["NAME:MeshLink", "ImportMesh:=", False],
-                                    "NonlinearSolverResidual:=", "0.0001", "TimeIntegrationMethod:=", "BackwardEuler",
-                                    "SmoothBHCurve:=", False, "StopTime:=", D["stop"], "TimeStep:=", D["step"],
-                                    "OutputError:=", False, "UseControlProgram:=", False,
-                                    "ControlProgramName:=", " ", "ControlProgramArg:=", " ",
-                                    "CallCtrlProgAfterLastStep:=", False, "FastReachSteadyState:=", False,
-                                    "AutoDetectSteadyState:=", False, "IsGeneralTransient:=", True,
-                                    "IsHalfPeriodicTransient:=", False, "SaveFieldsType:=", "Every N Steps",
-                                    "N Steps:=", "20", "Steps From:=", "0ms", "Steps To:=", D["stop"],
-                                    "UseNonLinearIterNum:=", False, "CacheSaveKind:=", "Count",
-                                    "NumberSolveSteps:=", 1, "RangeStart:=", "0s", "RangeEnd:=", "0.1s"])
+full = ["NAME:Transient", "Enabled:=", True, ["NAME:MeshLink", "ImportMesh:=", False],
+        "NonlinearSolverResidual:=", "0.0001", "TimeIntegrationMethod:=", "BackwardEuler",
+        "SmoothBHCurve:=", False, "StopTime:=", D["stop"], "TimeStep:=", D["step"],
+        "OutputError:=", False, "UseControlProgram:=", False,
+        "ControlProgramName:=", " ", "ControlProgramArg:=", " ",
+        "CallCtrlProgAfterLastStep:=", False, "FastReachSteadyState:=", False,
+        "AutoDetectSteadyState:=", False, "IsGeneralTransient:=", True,
+        "IsHalfPeriodicTransient:=", False, "SaveFieldsType:=", "Every N Steps",
+        "N Steps:=", "20", "Steps From:=", "0ms", "Steps To:=", D["stop"],
+        "UseNonLinearIterNum:=", False, "CacheSaveKind:=", "Count",
+        "NumberSolveSteps:=", 1, "RangeStart:=", "0s", "RangeEnd:=", "0.1s"]
+basic = ["NAME:Transient", "Enabled:=", True, "NonlinearSolverResidual:=", "0.0001",
+         "TimeIntegrationMethod:=", "BackwardEuler", "StopTime:=", D["stop"], "TimeStep:=", D["step"],
+         "SaveFieldsType:=", "Every N Steps", "N Steps:=", "20", "Steps From:=", "0ms", "Steps To:=", D["stop"]]
+minimal = ["NAME:Transient", "Enabled:=", True, "StopTime:=", D["stop"], "TimeStep:=", D["step"]]
+for i, args in enumerate((full, basic, minimal)):
+    try:
+        oAnalysis.InsertSetup("Transient", args)
+        break
+    except Exception as e:
+        msg("setup variant %%d not accepted by this AEDT version (%%s) - trying a shorter one" %% (i + 1, e), 1)
 msg("transient setup")
 
 # ---------------------------------------------------------------- reports (optional)
@@ -214,13 +224,13 @@ def export(d, G, ref, out_dir, load):
     Ipk = math.sqrt(2) * abs(ref["I_rms"]) if load == "rated" else 0.0
     currents = {}
     for ph, th in zip("ABC", ref["phase_axes_deg"]):
-        currents[ph] = f"Ipk*cos(2*pi*Freq*Time + Theta_d0 + 180deg - ({th:.4f}deg))"
+        currents[ph] = f"Ipk*cos(2*pi*f_elec*Time + Theta_d0 + 180deg - ({th:.4f}deg))"
     proj = os.path.abspath(os.path.join(out_dir, f"IPM_SynCon_300kVAr_{load}_native.aedt")).replace("\\", "/")
     coils = [c["name"] for c in G["coils"]]
     mags = [m["name"] for m in G["magnets"]]
     data = dict(
         design=f"IPM_{d.poles}p_{load}", project=proj, L_mm=_r(d.L_stack * 1e3, 3),
-        variables=[("Ipk", f"{Ipk:.3f}A"), ("Freq", f"{d.f}Hz"), ("Speed_rpm", f"{d.rpm:.1f}"),
+        variables=[("Ipk", f"{Ipk:.3f}A"), ("f_elec", f"{d.f}Hz"), ("n_rpm", f"{d.rpm:.1f}"),
                    ("Theta_d0", f"{ref['theta_d_deg']:.4f}deg")],
         bh_stator=hb(STATOR_LAMINATION), bh_rotor=hb(ROTOR_FORGING),
         mu_rm=d.mu_rm, Hc=_r(d.Br() / (MU0 * d.mu_rm), 1),
@@ -232,7 +242,7 @@ def export(d, G, ref, out_dir, load):
         magnets=[dict(name=m["name"], north=bool(m["north"]),
                       mag_deg=(m["axis_deg"] + (0.0 if m["north"] else 180.0)) % 360.0,
                       poly=[(_r(x), _r(y)) for x, y in m["poly"]]) for m in G["magnets"]],
-        currents=currents, parallel=int(d.parallel_paths), turns=int(d.turns_per_coil),
+        rpm=f"{d.rpm:.1f}rpm", currents=currents, parallel=int(d.parallel_paths), turns=int(d.turns_per_coil),
         mesh=[("Mesh_magnets", mags, 2.0), ("Mesh_rotor", ["Rotor"], 4.0), ("Mesh_coils", coils, 3.0),
               ("Mesh_stator", ["Stator"], 5.0), ("Mesh_band", ["Band"], 1.5)],
         stop=f"{2 * period * 1e3:.3f}ms", step=f"{period / 200 * 1e3:.4f}ms",

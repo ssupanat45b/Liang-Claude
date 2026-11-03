@@ -190,8 +190,8 @@ def build(d, G, ref, args):
     f = d.f
     Ipk = math.sqrt(2) * abs(ref["I_rms"]) if load == "rated" else 0.0
     m2d["Ipk"] = f"{Ipk:.3f}A"
-    m2d["Freq"] = f"{f}Hz"
-    m2d["Speed_rpm"] = f"{d.rpm:.1f}"
+    m2d["f_elec"] = f"{f}Hz"
+    m2d["n_rpm"] = f"{d.rpm:.1f}"
     m2d["Theta_d0"] = f"{ref['theta_d_deg']:.4f}deg"
 
     # ---- materials -----------------------------------------------------------------------
@@ -252,7 +252,7 @@ def build(d, G, ref, args):
     # ---- windings: Ipk*cos(w t + Theta_d0 + 180 deg - theta_phase) -> current on the -d axis -------
     for ph, th in zip("ABC", ref["phase_axes_deg"]):
         phase = f"Theta_d0 + 180deg - ({th:.4f}deg)" if load == "rated" else "0deg"
-        expr = f"Ipk*cos(2*pi*Freq*Time + {phase})"
+        expr = f"Ipk*cos(2*pi*f_elec*Time + {phase})"
         w = m2d.assign_winding(assignment=None, winding_type="Current", is_solid=False, current=expr,
                                parallel_branches=d.parallel_paths, name=f"Phase{ph}")
         names = []

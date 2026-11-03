@@ -41,18 +41,21 @@ native script สร้างทุกอย่างเหมือน PyAEDT (
 แม่เหล็ก 4 ก้อนพร้อม CS, band 1500 rpm, A=0, winding/coil, mesh, transient setup, report)
 ถ้าขั้นใดใน script error ให้ส่งข้อความใน Message Manager มา
 
+**AEDT 2020 R2:** PyAEDT 1.x รองรับเฉพาะ AEDT 2022 R2 ขึ้นไป จึงต้องใช้ native script เท่านั้น
+(ชื่อตัวแปร `Freq` ชนกับตัวแปรภายในของ AEDT จึงเปลี่ยนเป็น `f_elec`; ความเร็วรอบคือ `n_rpm`)
+
 ## สิ่งที่สร้างในโปรเจกต์ `aedt_model/IPM_SynCon_300kVAr_<load>.aedt`
 | ส่วน | รายละเอียด |
 |---|---|
 | วัสดุ | M330_50A_pyFEM / RotorSteel_pyFEM (B-H nonlinear เดียวกับ Python), NdFeB_N38SH_80C (Br 1.141 T, μr 1.05), copper |
 | เรขาคณิต | Stator, Coil_X_nn_top/bot (2×Qs), Rotor, Magnet_n (มี CS ของตัวเอง ทิศ N/S สลับ), barrier = air |
 | Motion | Band หมุน 1500 rpm, A = 0 ที่ขอบ Region |
-| Winding | PhaseA/B/C แบบ Current, `Ipk*cos(2*pi*Freq*Time + Theta_d0 + 180deg - θph)` → กระแสอยู่แกน −d (over-excited, ส่ง kVAr) |
+| Winding | PhaseA/B/C แบบ Current, `Ipk*cos(2*pi*f_elec*Time + Theta_d0 + 180deg - θph)` → กระแสอยู่แกน −d (over-excited, ส่ง kVAr) |
 | Mesh | length-based: magnet 2 mm, band 1.5 mm, coil 3 mm, rotor 4 mm, stator 5 mm |
 | Setup | Transient 2 คาบ, step = T/200 |
 | Report | Torque, FluxLinkage, InducedVoltage, Current |
 
-ตัวแปร design (`Ipk`, `Freq`, `Speed_rpm`, `Theta_d0`) แก้ได้ใน Project ▸ Design Properties
+ตัวแปร design (`Ipk`, `f_elec`, `n_rpm`, `Theta_d0`) แก้ได้ใน Project ▸ Design Properties
 เช่นตั้ง `Ipk = 0A` เพื่อดู no-load EMF/cogging
 
 ## การเปรียบเทียบผล
