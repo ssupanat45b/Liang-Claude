@@ -1,8 +1,8 @@
 """Constrained multi-objective Bayesian optimisation (2 objectives, minimisation).
 
-* Objective 1 (active mass) is analytic and exact -> no surrogate needed.
-* Objective 2 (EM losses) and the FEM constraints (Q, magnet B at short circuit,
-  tooth B) are modelled with Gaussian processes (Matern-5/2, ARD, noise term).
+* Both objectives (active mass - which depends on the FEM-sized magnet - and EM
+  losses) and the FEM constraints (achievable Q, magnet B at short circuit, tooth B)
+  are modelled with Gaussian processes (Matern-5/2, ARD, noise term).
 * Acquisition: expected hypervolume improvement (Monte-Carlo over the GP of
   objective 2) x probability of feasibility.  Before the first feasible design
   is found the acquisition is the probability of feasibility alone.
@@ -84,21 +84,18 @@ class GP:
 
 
 # ----------------------------------------------------------------------------- acquisition
-def ehvi_mc(f1, mu2, sd2, front, ref, n_mc=48, rng=None):
-    """Expected hypervolume improvement for candidates with exact f1 and Gaussian f2."""
+def ehvi_mc(mu1, sd1, mu2, sd2, front, ref, n_mc=48, rng=None):
+    """Monte-Carlo expected hypervolume improvement for independent Gaussian objectives."""
     rng = rng or np.random.default_rng(0)
     base = hypervolume_2d(front, ref) if len(front) else 0.0
-    z = rng.standard_normal(n_mc)
-    out = np.zeros(len(f1))
-    for i in range(len(f1)):
-        if f1[i] >= ref[0]:
-            continue
-        samples = mu2[i] + sd2[i] * z
+    z1, z2 = rng.standard_normal(n_mc), rng.standard_normal(n_mc)
+    out = np.zeros(len(mu1))
+    for i in range(len(mu1)):
         hv = 0.0
-        for y in samples:
-            if y >= ref[1]:
+        for a, b in zip(mu1[i] + sd1[i] * z1, mu2[i] + sd2[i] * z2):
+            if a >= ref[0] or b >= ref[1]:
                 continue
-            pts = np.vstack([front, [[f1[i], y]]]) if len(front) else np.array([[f1[i], y]])
+            pts = np.vstack([front, [[a, b]]]) if len(front) else np.array([[a, b]])
             hv += hypervolume_2d(pts, ref) - base
         out[i] = hv / n_mc
     return out
@@ -107,8 +104,8 @@ def ehvi_mc(f1, mu2, sd2, front, ref, n_mc=48, rng=None):
 def prob_feasible(models, X, limits):
     """Product of per-constraint probabilities.  models: dict name -> GP."""
     p = np.ones(len(X))
-    mu, sd = models["Q"].predict(X)
-    p *= norm.cdf((mu - limits["Q_min"]) / sd) - norm.cdf((mu - limits["Q_max"]) / sd)
+    mu, sd = models["Qmax"].predict(X)                   # rating achievable with some thickness
+    p *= norm.cdf((mu - limits["Q_min"]) / sd)
     mu, sd = models["Bd"].predict(X)
     p *= norm.cdf((mu - limits["Bd_min"]) / sd)
     mu, sd = models["Bt"].predict(X)
@@ -116,9 +113,10 @@ def prob_feasible(models, X, limits):
     return np.clip(p, 0, 1)
 
 
-def select_batch(U, f1, models, front, ref, limits, q, min_dist=0.08, rng=None):
+def select_batch(U, models, front, ref, limits, q, min_dist=0.08, rng=None):
     """Greedy batch: maximise EHVI*PoF, believer update of the front, distance penalty."""
     pof = prob_feasible(models, U, limits)
+    mu1, sd1 = models["M"].predict(U)
     mu2, sd2 = models["P"].predict(U)
     chosen = []
     front = np.array(front, float).reshape(-1, 2)
@@ -127,10 +125,10 @@ def select_batch(U, f1, models, front, ref, limits, q, min_dist=0.08, rng=None):
             acq = pof.copy()
         else:
             # pre-screen with a cheap optimistic bound, then exact MC-EHVI on the best few hundred
-            opt = np.maximum(0.0, ref[1] - (mu2 - 2 * sd2)) * np.maximum(0.0, ref[0] - f1) * pof
+            opt = np.maximum(0.0, ref[1] - (mu2 - 2 * sd2)) * np.maximum(0.0, ref[0] - (mu1 - 2 * sd1)) * pof
             idx = np.argsort(-opt)[:300]
             acq = np.zeros(len(U))
-            acq[idx] = ehvi_mc(f1[idx], mu2[idx], sd2[idx], front, ref, rng=rng) * pof[idx]
+            acq[idx] = ehvi_mc(mu1[idx], sd1[idx], mu2[idx], sd2[idx], front, ref, rng=rng) * pof[idx]
             if acq.max() <= 0:                           # nothing improves: explore feasibility
                 acq = pof * sd2
         for c in chosen:                                 # keep the batch diverse
@@ -141,6 +139,6 @@ def select_batch(U, f1, models, front, ref, limits, q, min_dist=0.08, rng=None):
             break
         chosen.append(j)
         if pof[j] > 0.5:                                 # Kriging believer
-            front = np.vstack([front, [[f1[j], mu2[j]]]])
+            front = np.vstack([front, [[mu1[j], mu2[j]]]])
             front = front[pareto_mask(front)]
     return chosen

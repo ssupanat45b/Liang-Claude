@@ -203,12 +203,13 @@ class Live:
             c = POLE_COL[r["poles"]]
             axd.plot(r["D"] * 1e3, r["L"] * 1e3, "o" if f else ".", color=c, ms=6 if f else 4, alpha=0.9 if f else 0.4)
             if r.get("fem_ok"):
-                axm.plot(r["h_m"] * 1e3, r["Q_kVAr"], "o" if f else ".", color=c, ms=6 if f else 4, alpha=0.9 if f else 0.4)
-        axm.axhspan(LIMITS["Q_min"], LIMITS["Q_max"], color="#1e8449", alpha=0.12)
+                axm.plot(r["D"] * 1e3, min(r.get("Q_max_kVAr", 0), 600), "o" if f else ".", color=c,
+                         ms=6 if f else 4, alpha=0.9 if f else 0.4)
+        axm.axhline(LIMITS["Q_min"], color="#1e8449", ls="--")
         axd.set_xlabel("bore Ø [mm]"); axd.set_ylabel("core length [mm]"); axd.grid(alpha=.3)
         axd.set_title("Explored design space (large = feasible)")
-        axm.set_xlabel("magnet thickness [mm]"); axm.set_ylabel("Q at 400 V [kVAr]"); axm.grid(alpha=.3)
-        axm.set_title("Reactive power vs magnet thickness (green band = target)")
+        axm.set_xlabel("bore Ø [mm]"); axm.set_ylabel("max achievable Q at 400 V [kVAr]"); axm.grid(alpha=.3)
+        axm.set_title("Achievable Q with the best magnet thickness (green = 300 kVAr)")
         axm.set_ylim(0, 600)
         path = os.path.join(self.dir, f"iter_{it:02d}.png")
         fig.savefig(path, dpi=110)
@@ -356,9 +357,9 @@ def main():
                 r = fu.result(); r["it"] = it
                 rows.append(r); ids.append(len(rows) - 1)
                 f = is_feasible(r)
-                print(f"  [{len(rows):3d}] {r['poles']}p Ø{r['D'] * 1e3:4.0f} L{r['L'] * 1e3:5.0f} h{r['h_m'] * 1e3:5.1f} "
-                      f"w{r['w_frac']:.2f} d{r['d_frac']:.3f} -> "
-                      + (f"Q {r['Q_kVAr']:6.1f}  mass {r['m_active']:6.0f} kg  loss {r['P_loss_kW']:5.2f} kW  "
+                print(f"  [{len(rows):3d}] {r['poles']}p Ø{r['D'] * 1e3:4.0f} L{r['L'] * 1e3:5.0f} "
+                      f"w{r['w_frac']:.2f} d{r['d_frac']:.3f} -> magnet {r['h_m'] * 1e3:5.1f} mm  "
+                      + (f"Q {r['Q_kVAr']:6.1f} (max {r.get('Q_max_kVAr', float('nan')):5.0f})  mass {r['m_active']:6.0f} kg  loss {r['P_loss_kW']:5.2f} kW  "
                          f"Bsc {r['Bd_min_sc']:5.2f}  {'FEASIBLE' if f else ''}" if r.get("fem_ok") else r.get("reason", ""))
                       + f"  ({r['runtime_s']:.0f} s)", flush=True)
         save_rows(rows, csv_path)
@@ -375,15 +376,15 @@ def main():
     for it in range(it0, it0 + a.iters):
         ok = [r for r in rows if r.get("fem_ok")]
         X = np.array([to_unit(r) for r in ok])
-        models = dict(P=GP(log=True).fit(X, [r["P_loss_kW"] for r in ok]),
-                      Q=GP().fit(X, [r["Q_kVAr"] for r in ok]),
+        models = dict(M=GP(log=True).fit(X, [r["m_active"] for r in ok]),
+                      P=GP(log=True).fit(X, [r["P_loss_kW"] for r in ok]),
+                      Qmax=GP().fit(X, [min(r["Q_max_kVAr"], 600.0) for r in ok]),
                       Bd=GP().fit(X, [r["Bd_min_sc"] for r in ok]),
                       Bt=GP().fit(X, [r["B_tooth_rated"] for r in ok]))
         C = candidates(rows, 1024, a.seed * 1000 + it, rng)
         U = np.array([to_unit(c) for c in C])
-        f1 = np.array([c["m_active"] for c in C])
         _, F = front_of(rows)
-        chosen = select_batch(U, f1, models, F, REF, LIMITS, a.batch, rng=rng)
+        chosen = select_batch(U, models, F, REF, LIMITS, a.batch, rng=rng)
         designs = [{k: C[j][k] for k in ("poles",) + CONT} for j in chosen]
         print(f"\nIteration {it}: {len(C)} candidates, evaluating {len(designs)}")
         ids = run_batch(designs, it)

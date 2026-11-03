@@ -9,8 +9,9 @@ multi-objective Bayesian optimisation (MOBO) on top of the validated nonlinear F
 
 | | |
 |---|---|
-| Variables | poles **{2, 4, 6, 8}**, bore **Ø 250–550 mm**, core length **100–1200 mm**, magnet **thickness 8–70 mm**, magnet **depth** 6–20 % of the pole pitch, magnet **width** 60–100 % of the widest that fits |
-| Objective 1 | **active mass** (stator + rotor iron + magnets + copper), minimised (analytic, exact) |
+| Variables | poles **{2, 4, 6, 8}**, bore **Ø 250–550 mm**, core length **100–1200 mm**, magnet **depth** 6–20 % of the pole pitch, magnet **width** 60–100 % of the widest that fits |
+| Magnet thickness | **not free**: for every design it is found by FEM root-finding so that Q = 305 kVAr at 400 V (scan 4–80 mm, then brentq or a bounded maximisation, because Q(h) peaks for flat bars). A design is infeasible if no thickness reaches 300 kVAr. |
+| Objective 1 | **active mass** (stator + rotor iron + magnets + copper), minimised |
 | Objective 2 | **EM losses** (iron from FEM + armature copper), minimised |
 | Constraints | 300 ≤ Q(400 V) ≤ 330 kVAr · magnet B at a 3-phase short circuit ≥ 0.10 T · stator tooth B (rated) ≤ 2.0 T · 0.3 ≤ L/D ≤ 3.0 · valid rotor geometry (bridges, q-axis rib) |
 | Derived (sizing rules) | q = 3 winding with 7/9 pitch, turns from 400 V, slot depth from 3.7 A/mm², yoke at 1.4 T, gap 0.625 % of D, bridges 0.3 % of D |
@@ -19,11 +20,11 @@ multi-objective Bayesian optimisation (MOBO) on top of the validated nonlinear F
 
 * **Sobol initial design**, spread evenly over the 4 pole counts. Only geometrically
   valid designs are sampled (cheap analytic check).
-* **Gaussian processes** (Matern 5/2, ARD, noise) model losses (log scale), Q, magnet B at
-  short circuit and tooth B. The GP input is the 5 continuous variables plus a one-hot
-  pole number.
-* **Acquisition:** expected hypervolume improvement (Monte-Carlo) × probability of
-  feasibility. The mass objective is exact, so only the loss objective carries uncertainty.
+* **Gaussian processes** (Matern 5/2, ARD, noise) model mass and losses (log scale), the
+  maximum achievable Q, magnet B at short circuit and tooth B. The GP input is the 4
+  continuous variables plus a one-hot pole number.
+* **Acquisition:** expected hypervolume improvement (Monte-Carlo over both objectives) ×
+  probability of feasibility.
 * **Batches of q designs per iteration** (greedy, Kriging-believer front update, distance
   penalty), evaluated by FEM **in parallel**.
 * Candidates per iteration: Sobol points over the whole space plus local perturbations
@@ -34,7 +35,7 @@ multi-objective Bayesian optimisation (MOBO) on top of the validated nonlinear F
 
 ```bash
 pip install numpy scipy matplotlib triangle scikit-learn pypardiso
-python run_bo.py --jobs 8                       # 32 initial + 12 x 8 = 128 FEM evaluations
+python run_bo.py --jobs 8                       # 32 initial + 12 x 8 = 128 designs (each ~15 FEM solves for magnet sizing)
 python run_bo.py --jobs 8 --iters 20            # longer search
 python run_bo.py --resume --iters 5             # continue a previous run
 python run_bo.py --final-only                   # re-select and re-analyse from results/all_evals.csv
@@ -69,7 +70,7 @@ point after normalising both objectives. The **lifetime-cost** pick adds materia
 * จำนวนขั้ว 2/4/6/8
 * Ø bore
 * ความยาวแกน
-* ขนาดแม่เหล็กสี่เหลี่ยม (หนา ลึก กว้าง)
+* ขนาดแม่เหล็กสี่เหลี่ยม (ความลึกและความกว้าง) ส่วนความหนาคำนวณด้วย FEM ให้ได้ 305 kVAr ทุกครั้ง
 
 **เป้าหมาย:**
 * ① น้ำหนักเบาที่สุด

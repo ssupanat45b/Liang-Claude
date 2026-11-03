@@ -5,9 +5,13 @@ Design variables
     poles   : {2, 4, 6, 8}                (categorical)
     D       : stator bore diameter [m]
     L       : active core length [m]
-    h_m     : magnet thickness [m]
     d_frac  : magnet depth below the rotor surface / pole pitch
     w_frac  : magnet width / widest width allowed (bridge corner and q-axis rib)
+
+The magnet THICKNESS is not a free variable: for every design it is found by FEM
+root-finding so that the condenser delivers Q_target at rated voltage (designer's
+practice; the Q constraint is then met by construction).  If no thickness reaches
+the rating, the design is infeasible and its maximum achievable Q is recorded.
 
 Everything else follows from classical sizing rules (q = 3 winding with 7/9
 pitch, turns from the voltage, slot depth from the current density, yoke from
@@ -26,8 +30,10 @@ import time
 import numpy as np
 
 POLES = (2, 4, 6, 8)
-BOUNDS = dict(D=(0.25, 0.55), L=(0.10, 1.20), h_m=(0.008, 0.070), d_frac=(0.06, 0.20), w_frac=(0.60, 1.00))
-CONT = ("D", "L", "h_m", "d_frac", "w_frac")
+BOUNDS = dict(D=(0.25, 0.55), L=(0.10, 1.20), d_frac=(0.06, 0.20), w_frac=(0.60, 1.00))
+CONT = ("D", "L", "d_frac", "w_frac")
+Q_TARGET = 305.0             # kVAr at rated voltage (inside the 300-330 band)
+H_MIN, H_MAX = 0.004, 0.080  # magnet thickness search range [m]
 
 RULES = dict(
     S=300e3, V=400.0, f=50.0, B1=0.85, kE=1.06, B_yoke=1.40, J=3.7e6, fill=0.45,
@@ -95,7 +101,7 @@ def make_design(x):
         t_bridge=max(z["bridge_min"], z["bridge_frac"] * D),
         Qs=Qs, div_per_slot=div, slot_divs=div // 2, s_wedge=s_wedge, s_layer=s_layer,
         coil_pitch=z["pitch_num"], parallel_paths=a, turns_per_coil=tpc,
-        h_m=float(x["h_m"]), magnet_shape="rect", d_m=float(x["d_frac"]) * tau_p,
+        h_m=float(x.get("h_m", 0.010)), magnet_shape="rect", d_m=float(x["d_frac"]) * tau_p,
         w_frac=float(x["w_frac"]), corner_margin=max(0.002, z["corner_frac"] * D),
         barrier_deg=z["barrier_frac_rect"] * 360.0 / p, barrier_gap_deg=z["barrier_gap_frac"] * 360.0 / p,
         X_end_pu=X_end, skew_slots=1.0, fill_arm=z["fill"], end_arm=end_arm, gap_layers=12, radial_refine=1)
@@ -148,18 +154,75 @@ def cheap(x):
 
 
 # ----------------------------------------------------------------------------- FEM
+def _q_at(d, h):
+    """Q [kVAr] at rated voltage for magnet thickness h (raises ValueError if geometry invalid)."""
+    import copy
+    from ipm_fem2d.analysis import PMAnalysis
+    dd = copy.deepcopy(d); dd.h_m = h
+    dd.check()
+    an = PMAnalysis(dd, verbose=False); an.find_axes()
+    try:
+        I, _ = an.current_for_voltage(dd.V_phase)
+    except ValueError:                                  # EMF far too low/high for the bracket
+        return -1e4
+    return 3 * dd.V_phase * I / 1e3
+
+
+def size_magnet(d, target=Q_TARGET):
+    """Thickness giving `target` kVAr.  Q(h) is not monotonic for flat bars (thicker bars must
+    narrow to keep the q-axis rib): coarse scan, then brentq on the first rising crossing, or a
+    bounded maximisation if the rating is never reached.  Returns (h, Q_at_h, Q_max, n_fem)."""
+    from scipy.optimize import brentq, minimize_scalar
+    hs = np.linspace(H_MIN, H_MAX, 8)
+    n, prev, best = 0, None, (-1e9, None)
+    for h in hs:
+        try:
+            q = _q_at(d, h)
+        except ValueError:
+            break
+        n += 1
+        best = max(best, (q, h))
+        if q >= target:
+            if prev is None:
+                return h, q, q, n
+            hh = brentq(lambda t: _q_at(d, t) - target, prev[0], h, xtol=3e-4)
+            return hh, target, max(best[0], target), n + 6
+        prev = (h, q)
+    if best[1] is None:
+        return None, None, None, n
+    step = hs[1] - hs[0]
+    opt = minimize_scalar(lambda t: -_q_at(d, t), method="bounded",
+                          bounds=(max(H_MIN, best[1] - step), best[1] + step), options=dict(xatol=1e-3))
+    h_pk, q_pk = float(opt.x), -float(opt.fun)
+    if q_pk >= target:
+        lo = max(H_MIN, best[1] - step)
+        hh = brentq(lambda t: _q_at(d, t) - target, lo, h_pk, xtol=3e-4)
+        return hh, target, q_pk, n + 14
+    return h_pk, q_pk, q_pk, n + 8
+
+
 def fem_evaluate(args):
-    """Worker: full nonlinear FEM evaluation of one design.  args = (x, solver_name)."""
+    """Worker: size the magnet for the rating, then evaluate the design.  args = (x, solver_name)."""
     x, solver_name = args
     from ipm_fem2d import solver
     from ipm_fem2d.analysis import PMAnalysis
     solver.set_backend(solver_name)
     t0 = time.time()
+    x = dict(x)
+    x.setdefault("h_m", 0.010)
     r = cheap(x)
     if not r["valid"]:
         r.update(fem_ok=False, runtime_s=time.time() - t0)
         return r
     try:
+        d, _ = make_design(x)
+        h, q_h, q_max, nfem = size_magnet(d)
+        if h is None:
+            r.update(fem_ok=False, reason="no valid magnet thickness", runtime_s=time.time() - t0)
+            return r
+        x["h_m"] = h
+        r = cheap(x)                                    # masses with the sized magnet
+        r.update(Q_max_kVAr=q_max, sized=bool(q_h is not None and q_h >= LIMITS["Q_min"]))
         d, _ = make_design(x)
         an = PMAnalysis(d, verbose=False)
         an.find_axes()
@@ -179,8 +242,7 @@ def fem_evaluate(args):
                  Bd_min_rated=float(an.model.magnet_Bd(sol_r).min()),
                  B_tooth_rated=sm["B_stator_tooth_rated"], B_yoke_rated=sm["B_stator_yoke_rated"],
                  P_iron_kW=L["P_iron_kW"], P_cu_fem_kW=L["P_arm_cu_kW"],
-                 P_loss_kW=L["P_iron_kW"] + r["P_cu_kW"],
-                 m_magnet_fem=sm["mass_magnet_t"] * 1e3, H_s=sm["H_inertia_s"])
+                 P_loss_kW=L["P_iron_kW"] + r["P_cu_kW"], n_fem_sizing=nfem, H_s=sm["H_inertia_s"])
     except Exception as e:                               # noqa: BLE001
         r.update(fem_ok=False, reason=f"FEM: {type(e).__name__}: {e}")
     r["runtime_s"] = time.time() - t0
